@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos de editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+tmp/
+temp/
+
+# Compilados
+dist/
+build/

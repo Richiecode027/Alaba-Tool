@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alaba Tool - Gestor de Cifrados Musicales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Estilos personalizados */
+        .chord {
+            color: #dc2626;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .chord-display {
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .print-content {
+            background: white;
+            color: black;
+        }
+
+        .print-content .chord {
+            color: #000;
+        }
+
+        /* Estilos para impresión */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            .print-hidden {
+                display: none !important;
+            }
+
+            .print-content {
+                page-break-after: avoid;
+            }
+
+            .chord-display {
+                color: black;
+            }
+
+            .chord {
+                color: black;
+            }
+        }
+
+        /* Auto-scroll bar */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .slider {
+            flex: 1;
+            height: 4px;
+            border-radius: 3px;
+            background: #d3d3d3;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #dc2626;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #dc2626;
+            cursor: pointer;
+            border: none;
+        }
+
+        /* Animación de carga */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #dc2626;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .song-item-hover:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Navegación principal -->
+    <nav id="mainNav" class="bg-red-600 text-white shadow-lg print-hidden">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">🎵 Alaba Tool</h1>
+                <div class="space-x-4">
+                    <button onclick="showSection('songs-list')" class="px-4 py-2 hover:bg-red-700 rounded">Canciones</button>
+                    <button onclick="showSection('new-song')" class="px-4 py-2 hover:bg-red-700 rounded">Nueva Canción</button>
+                    <button onclick="showSection('song-detail')" class="px-4 py-2 hover:bg-red-700 rounded">Vista Actual</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Indicador de carga -->
+    <div id="loadingIndicator" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-4">
+            <div class="spinner"></div>
+            <span class="text-lg font-semibold">Procesando...</span>
+        </div>
+    </div>
+        <!-- Sección: Lista de Canciones -->
+        <section id="songs-list" class="section-content">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">Mis Canciones</h2>
+
+                <!-- Barra de búsqueda -->
+                <div class="mb-6">
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Buscar por título o autor..."
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                            onkeyup="handleSearch()"
+                        >
+                        <button onclick="handleSearch()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                            Buscar
+                        </button>
+                        <button onclick="loadAllSongs()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de canciones -->
+                <div id="songsList" class="space-y-4">
+                    <div class="text-center text-gray-500">Cargando canciones...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Nueva Canción -->
+        <section id="new-song" class="section-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">Nueva Canción</h2>
+
+                <form id="newSongForm" onsubmit="handleCreateSong(event)">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Título *</label>
+                        <input type="text" id="titulo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Autor</label>
+                            <input type="text" id="autor" placeholder="Opcional" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Género *</label>
+                            <select id="genero" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                                <option value="">Seleccionar género...</option>
+                                <option value="Himno">Himno</option>
+                                <option value="Canto">Canto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Tono Original *</label>
+                        <select id="tonoOriginal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                            <option value="">Seleccionar tono...</option>
+                            <option value="C">C</option>
+                            <option value="C#">C#</option>
+                            <option value="D">D</option>
+                            <option value="D#">D#</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="F#">F#</option>
+                            <option value="G">G</option>
+                            <option value="G#">G#</option>
+                            <option value="A">A</option>
+                            <option value="A#">A#</option>
+                            <option value="B">B</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Letra con Acordes *</label>
+                        <p class="text-gray-600 text-sm mb-2">Usa [ACORDE] para marcar acordes. Ejemplo: [G]Te loamos [C]oh Dios</p>
+                        <textarea id="contenido" required rows="12" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 font-mono"></textarea>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">
+                            Crear Canción
+                        </button>
+                        <button type="reset" class="px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 font-bold">
+                            Limpiar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Sección: Detalle de Canción -->
+        <section id="song-detail" class="section-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 print-content" id="songDetailContainer">
+                <div id="songDetailControls" class="print-hidden">
+                    <h2 id="detailTitle" class="text-3xl font-bold mb-2 text-gray-800">-</h2>
+                    <p id="detailAuthor" class="text-gray-600 mb-6">-</p>
+
+                    <!-- Controles de transposición y notación -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-100 p-4 rounded-lg">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Tono Actual</label>
+                            <select id="transpositionKey" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-600">
+                                <option value="C">C</option>
+                                <option value="C#">C#</option>
+                                <option value="D">D</option>
+                                <option value="D#">D#</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="F#">F#</option>
+                                <option value="G">G</option>
+                                <option value="G#">G#</option>
+                                <option value="A">A</option>
+                                <option value="A#">A#</option>
+                                <option value="B">B</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Transposar a</label>
+                            <select id="targetKey" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-600">
+                                <option value="C">C</option>
+                                <option value="C#">C#</option>
+                                <option value="D">D</option>
+                                <option value="D#">D#</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="F#">F#</option>
+                                <option value="G">G</option>
+                                <option value="G#">G#</option>
+                                <option value="A">A</option>
+                                <option value="A#">A#</option>
+                                <option value="B">B</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Controles de auto-scroll -->
+                    <div class="bg-blue-100 p-4 rounded-lg mb-6 print-hidden">
+                        <h3 class="text-lg font-bold text-blue-900 mb-3">Modo Presentación</h3>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <button onclick="toggleAutoScroll()" id="autoScrollBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">
+                                ▶ Iniciar Auto-Scroll
+                            </button>
+                            <button onclick="togglePauseScroll()" id="pauseScrollBtn" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 font-bold hidden">
+                                ⏸ Pausar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="flex gap-4 mb-6 flex-wrap">
+                        <button onclick="editCurrentSong()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">
+                            ✏️ Editar
+                        </button>
+                        <button onclick="printSong()" class="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-bold">
+                            🖨️ Imprimir
+                        </button>
+                        <button onclick="deleteCurrentSong()" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">
+                            🗑️ Eliminar
+                        </button>
+                        <button onclick="showSection('songs-list')" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 font-bold">
+                            ← Volver
+                        </button>
+                    </div>
+
+                    <hr class="mb-6">
+                </div>
+
+                <!-- Contenido de la canción -->
+                <div id="songContent" class="chord-display bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Editar Canción -->
+        <section id="edit-song" class="section-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">Editar Canción</h2>
+
+                <form id="editSongForm" onsubmit="handleUpdateSong(event)">
+                    <input type="hidden" id="editSongId">
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Título *</label>
+                        <input type="text" id="editTitulo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Autor</label>
+                            <input type="text" id="editAutor" placeholder="Opcional" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">Género *</label>
+                            <select id="editGenero" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                                <option value="">Seleccionar género...</option>
+                                <option value="Himno">Himno</option>
+                                <option value="Canto">Canto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Tono Original *</label>
+                        <select id="editTonoOriginal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                            <option value="C">C</option>
+                            <option value="C#">C#</option>
+                            <option value="D">D</option>
+                            <option value="D#">D#</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="F#">F#</option>
+                            <option value="G">G</option>
+                            <option value="G#">G#</option>
+                            <option value="A">A</option>
+                            <option value="A#">A#</option>
+                            <option value="B">B</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Letra con Acordes *</label>
+                        <textarea id="editContenido" required rows="12" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 font-mono"></textarea>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
+                            💾 Guardar Cambios
+                        </button>
+                        <button type="button" onclick="showSection('song-detail')" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-bold">
+                            ← Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <!-- Botones flotantes de transposición -->
+    <div id="floatingControls" class="fixed right-4 top-1/2 transform -translate-y-1/2 space-y-2 hidden z-40">
+        <button onclick="transposeUp()" class="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 font-bold text-lg flex items-center justify-center" title="Subir tono">
+            +
+        </button>
+        <button onclick="transposeDown()" class="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 font-bold text-lg flex items-center justify-center" title="Bajar tono">
+            −
+        </button>
+    </div>
+
+    <!-- Control flotante de velocidad -->
+    <div id="speedControl" class="fixed right-4 bottom-4 bg-white rounded-lg shadow-lg p-3 hidden z-40">
+        <div class="text-sm font-bold text-gray-700 mb-2">Velocidad</div>
+        <input type="range" id="scrollSpeed" class="slider" min="1" max="10" value="3" title="Ajusta la velocidad del scroll">
+        <div class="text-xs text-gray-500 mt-1 text-center" id="speedLabel">3</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
