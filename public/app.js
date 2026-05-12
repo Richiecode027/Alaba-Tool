@@ -4,6 +4,7 @@ let allSongs = [];
 let autoScrollActive = false;
 let scrollPaused = false;
 let scrollInterval = null;
+let currentDisplayedKey = null; // Tono actualmente mostrado
 
 // Indicador de carga
 function showLoading() {
@@ -34,20 +35,34 @@ function setupEventListeners() {
         }
     });
 
-    // Cambiar velocidad del scroll
-    document.getElementById('scrollSpeed').addEventListener('change', (e) => {
-        document.getElementById('speedLabel').textContent = e.target.value;
-        if (autoScrollActive && !scrollPaused) {
-            clearInterval(scrollInterval);
-            startAutoScroll();
-        }
-    });
+    // Configurar event listener para scrollSpeed cuando se muestre
+    setupScrollSpeedListener();    setupTranspositionKeyListener();}
 
-    // Actualizar tono inicial cuando se carga una canción
-    document.getElementById('transpositionKey').addEventListener('change', () => {
-        if (currentSong) {
-            document.getElementById('transpositionKey').value = currentSong.tono_original;
-        }
+// Configurar listener para control de velocidad
+function setupScrollSpeedListener() {
+    const scrollSpeedElement = document.getElementById('scrollSpeed');
+    if (scrollSpeedElement) {
+        scrollSpeedElement.addEventListener('change', (e) => {
+            document.getElementById('speedLabel').textContent = e.target.value;
+            if (autoScrollActive && !scrollPaused) {
+                clearInterval(scrollInterval);
+                startAutoScroll();
+            }
+        });
+    }
+}
+
+// Configurar listener para transpositionKey (si existe)
+function setupTranspositionKeyListener() {
+    const transpositionKeyElement = document.getElementById('transpositionKey');
+    if (transpositionKeyElement) {
+        transpositionKeyElement.addEventListener('change', () => {
+            if (currentSong) {
+                currentDisplayedKey = transpositionKeyElement.value;
+            }
+        });
+    }
+}
     });
 }
 
@@ -65,6 +80,8 @@ function showSection(sectionId) {
     if (sectionId === 'song-detail') {
         floatingControls.classList.remove('hidden');
         speedControl.classList.remove('hidden');
+        // Asegurar que el listener de velocidad esté configurado
+        setupScrollSpeedListener();
     } else {
         floatingControls.classList.add('hidden');
         speedControl.classList.add('hidden');
@@ -151,6 +168,7 @@ async function viewSong(id) {
         currentSong = await response.json();
 
         // Establecer el tono actual
+        currentDisplayedKey = currentSong.tono_original;
         document.getElementById('transpositionKey').value = currentSong.tono_original;
         document.getElementById('targetKey').value = currentSong.tono_original;
 
@@ -232,11 +250,10 @@ async function applyTransposition() {
 
 // Transponer un tono arriba
 async function transposeUp() {
-    if (!currentSong) return;
+    if (!currentSong || !currentDisplayedKey) return;
 
-    const currentKey = document.getElementById('transpositionKey').value;
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const currentIndex = notes.indexOf(currentKey);
+    const currentIndex = notes.indexOf(currentDisplayedKey);
     const newIndex = (currentIndex + 1) % 12;
     const newKey = notes[newIndex];
 
@@ -245,11 +262,10 @@ async function transposeUp() {
 
 // Transponer un tono abajo
 async function transposeDown() {
-    if (!currentSong) return;
+    if (!currentSong || !currentDisplayedKey) return;
 
-    const currentKey = document.getElementById('transpositionKey').value;
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const currentIndex = notes.indexOf(currentKey);
+    const currentIndex = notes.indexOf(currentDisplayedKey);
     const newIndex = (currentIndex - 1 + 12) % 12;
     const newKey = notes[newIndex];
 
@@ -258,11 +274,9 @@ async function transposeDown() {
 
 // Función auxiliar para transponer a una tonalidad específica
 async function transposeToKey(newKey) {
-    if (!currentSong) return;
+    if (!currentSong || !currentDisplayedKey) return;
 
-    const currentKey = document.getElementById('transpositionKey').value;
-
-    if (currentKey === newKey) {
+    if (currentDisplayedKey === newKey) {
         return; // No hay cambio
     }
 
@@ -273,7 +287,7 @@ async function transposeToKey(newKey) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contenido: currentSong.contenido,
-                tono_original: currentKey,
+                tono_original: currentDisplayedKey,
                 tono_nuevo: newKey,
                 isLatin: false
             })
@@ -283,7 +297,7 @@ async function transposeToKey(newKey) {
             const data = await response.json();
 
             currentSong.contenido = data.contenido;
-            currentSong.tono_original = newKey;
+            currentDisplayedKey = newKey;
             document.getElementById('transpositionKey').value = newKey;
             document.getElementById('targetKey').value = newKey;
             displaySongDetail();
