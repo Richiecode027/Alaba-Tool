@@ -4,11 +4,24 @@ let allSongs = [];
 let autoScrollActive = false;
 let scrollPaused = false;
 let scrollInterval = null;
-let currentDisplayedKey = null; // Tono actualmente mostrado
+let speedIndex = 1; // 0 -> x1, 1 -> x2, 2 -> x3 (default x2)
+// Reducir velocidad: hacer que las velocidades sean la mitad de rápidas (duplicar delays)
+const SPEED_DELAYS = [160, 80, 40]; // Delays en ms para cada velocidad
 
 // Indicador de carga
 function showLoading() {
     document.getElementById('loadingIndicator').classList.remove('hidden');
+}
+
+// Toggle programático del menú hamburguesa
+function toggleHamburger(forceOpen) {
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    if (!hamburgerMenu) return;
+    if (typeof forceOpen === 'boolean') {
+        hamburgerMenu.classList.toggle('hidden', !forceOpen);
+    } else {
+        hamburgerMenu.classList.toggle('hidden');
+    }
 }
 
 function hideLoading() {
@@ -35,35 +48,34 @@ function setupEventListeners() {
         }
     });
 
-    // Configurar event listener para scrollSpeed cuando se muestre
-    setupScrollSpeedListener();    setupTranspositionKeyListener();}
+    // Botón de velocidad (x1/x2/x3) - inicializar y configurar listener
+    const speedBtn = document.getElementById('speedToggleBtn');
+    if (speedBtn) {
+        speedBtn.textContent = ['x1', 'x2', 'x3'][speedIndex];
+        speedBtn.addEventListener('click', () => {
+            cycleSpeed();
+        });
+    }
 
-// Configurar listener para control de velocidad
-function setupScrollSpeedListener() {
-    const scrollSpeedElement = document.getElementById('scrollSpeed');
-    if (scrollSpeedElement) {
-        scrollSpeedElement.addEventListener('change', (e) => {
-            document.getElementById('speedLabel').textContent = e.target.value;
-            if (autoScrollActive && !scrollPaused) {
-                clearInterval(scrollInterval);
-                startAutoScroll();
+    // Botón hamburguesa: abrir/cerrar menú
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    if (hamburgerBtn && hamburgerMenu) {
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hamburgerMenu.classList.toggle('hidden');
+        });
+
+        // Cerrar menú al clic fuera
+        document.addEventListener('click', (e) => {
+            if (!hamburgerMenu.classList.contains('hidden')) {
+                const target = e.target;
+                if (!hamburgerMenu.contains(target) && target !== hamburgerBtn) {
+                    hamburgerMenu.classList.add('hidden');
+                }
             }
         });
     }
-}
-
-// Configurar listener para transpositionKey (si existe)
-function setupTranspositionKeyListener() {
-    const transpositionKeyElement = document.getElementById('transpositionKey');
-    if (transpositionKeyElement) {
-        transpositionKeyElement.addEventListener('change', () => {
-            if (currentSong) {
-                currentDisplayedKey = transpositionKeyElement.value;
-            }
-        });
-    }
-}
-    });
 }
 
 // Mostrar/ocultar secciones
@@ -73,18 +85,27 @@ function showSection(sectionId) {
     });
     document.getElementById(sectionId).classList.remove('hidden');
 
-    // Mostrar/ocultar controles flotantes
-    const floatingControls = document.getElementById('floatingControls');
-    const speedControl = document.getElementById('speedControl');
+    // Mostrar/ocultar navegación superior y menú hamburguesa en vista de canción
+    const mainNav = document.getElementById('mainNav');
+    const hamburgerContainer = document.getElementById('hamburgerContainer');
 
+    if (mainNav) mainNav.classList.toggle('hidden', sectionId === 'song-detail');
+    if (hamburgerContainer) hamburgerContainer.classList.toggle('hidden', sectionId !== 'song-detail');
+    const detailBackBtn = document.getElementById('detailBackBtn');
+    if (detailBackBtn) detailBackBtn.classList.toggle('hidden', sectionId !== 'song-detail');
+
+    // Maximizar espacio de letras en vista de canción
+    const songDetailContainer = document.getElementById('songDetailContainer');
+    const songDetailControls = document.getElementById('songDetailControls');
+    const songContent = document.getElementById('songContent');
     if (sectionId === 'song-detail') {
-        floatingControls.classList.remove('hidden');
-        speedControl.classList.remove('hidden');
-        // Asegurar que el listener de velocidad esté configurado
-        setupScrollSpeedListener();
+        if (songDetailContainer) songDetailContainer.classList.add('fullscreen-song');
+        if (songDetailControls) songDetailControls.classList.add('hidden');
+        if (songContent) songContent.classList.add('fullscreen');
     } else {
-        floatingControls.classList.add('hidden');
-        speedControl.classList.add('hidden');
+        if (songDetailContainer) songDetailContainer.classList.remove('fullscreen-song');
+        if (songDetailControls) songDetailControls.classList.remove('hidden');
+        if (songContent) songContent.classList.remove('fullscreen');
     }
 
     // Detener auto-scroll si cambiamos de sección
@@ -114,16 +135,36 @@ async function loadAllSongs() {
 // Buscar canciones
 async function handleSearch() {
     const query = document.getElementById('searchInput').value.trim();
+    const genre = (document.getElementById('genreFilter') && document.getElementById('genreFilter').value) || '';
 
-    if (query === '') {
+    // Si no hay query ni género, mostrar todo
+    if (query === '' && genre === '') {
+        renderSongsList(allSongs);
+        return;
+    }
+
+    // Si hay texto pero menos de 3 caracteres y no hay filtro por género, no buscar aún
+    if (query.length > 0 && query.length < 3 && genre === '') {
         renderSongsList(allSongs);
         return;
     }
 
     showLoading();
     try {
-        const response = await fetch(`/api/canciones/buscar/${encodeURIComponent(query)}`);
-        const results = await response.json();
+        let results = [];
+
+        if (query.length >= 3) {
+            const response = await fetch(`/api/canciones/buscar/${encodeURIComponent(query)}`);
+            results = await response.json();
+        } else {
+            // No hay query (vacío) pero sí filtro de género -> usar todas las canciones locales
+            results = allSongs.slice();
+        }
+
+        if (genre) {
+            results = results.filter(s => s.genero === genre);
+        }
+
         renderSongsList(results);
     } catch (error) {
         console.error('Error en la búsqueda:', error);
@@ -166,12 +207,6 @@ async function viewSong(id) {
     try {
         const response = await fetch(`/api/canciones/${id}`);
         currentSong = await response.json();
-
-        // Establecer el tono actual
-        currentDisplayedKey = currentSong.tono_original;
-        document.getElementById('transpositionKey').value = currentSong.tono_original;
-        document.getElementById('targetKey').value = currentSong.tono_original;
-
         // Mostrar la canción
         displaySongDetail();
         showSection('song-detail');
@@ -187,8 +222,10 @@ async function viewSong(id) {
 function displaySongDetail() {
     if (!currentSong) return;
 
+    // Mostrar solo el título; quitar autor/género/tono del encabezado
     document.getElementById('detailTitle').textContent = currentSong.titulo;
-    document.getElementById('detailAuthor').textContent = currentSong.autor ? `Por ${currentSong.autor} • Género: ${currentSong.genero} • Tono: ${currentSong.tono_original}` : `Género: ${currentSong.genero} • Tono: ${currentSong.tono_original}`;
+    const authorEl = document.getElementById('detailAuthor');
+    if (authorEl) authorEl.textContent = '';
 
     // Renderizar contenido con acordes resaltados
     const formattedContent = formatSongContent(currentSong.contenido);
@@ -198,62 +235,17 @@ function displaySongDetail() {
 // Formatear contenido de la canción con acordes coloreados
 function formatSongContent(content) {
     return content
-        .replace(/\[([^\]]+)\]/g, '<span class="chord">[$1]</span>')
+        .replace(/\[([^\]]+)\]/g, '<span class="chord">$1</span>')
         .replace(/\n/g, '<br>');
 }
 
-// Transponer canción
-async function applyTransposition() {
-    if (!currentSong) return;
-
-    const fromKey = document.getElementById('transpositionKey').value;
-    const toKey = document.getElementById('targetKey').value;
-
-    if (fromKey === toKey) {
-        return; // No hay cambio
-    }
-
-    showLoading();
-    try {
-        const response = await fetch('/api/transponer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contenido: currentSong.contenido,
-                tono_original: fromKey,
-                tono_nuevo: toKey,
-                isLatin: false
-            })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-
-            currentSong.contenido = data.contenido;
-            currentSong.tono_original = toKey;
-            document.getElementById('transpositionKey').value = toKey;
-            document.getElementById('targetKey').value = toKey;
-            displaySongDetail();
-        } else {
-            const errorText = await response.text();
-            console.error('Error HTTP:', response.status, response.statusText);
-            console.error('Respuesta del servidor:', errorText);
-            alert(`Error al transponer (${response.status}): ${errorText}`);
-        }
-    } catch (error) {
-        console.error('Error de red:', error);
-        alert(`Error de conexión: ${error.message}`);
-    } finally {
-        hideLoading();
-    }
-}
 
 // Transponer un tono arriba
 async function transposeUp() {
-    if (!currentSong || !currentDisplayedKey) return;
-
+    if (!currentSong) return;
+    const currentKey = currentSong.tono_original;
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const currentIndex = notes.indexOf(currentDisplayedKey);
+    const currentIndex = notes.indexOf(currentKey);
     const newIndex = (currentIndex + 1) % 12;
     const newKey = notes[newIndex];
 
@@ -262,10 +254,10 @@ async function transposeUp() {
 
 // Transponer un tono abajo
 async function transposeDown() {
-    if (!currentSong || !currentDisplayedKey) return;
-
+    if (!currentSong) return;
+    const currentKey = currentSong.tono_original;
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const currentIndex = notes.indexOf(currentDisplayedKey);
+    const currentIndex = notes.indexOf(currentKey);
     const newIndex = (currentIndex - 1 + 12) % 12;
     const newKey = notes[newIndex];
 
@@ -274,9 +266,10 @@ async function transposeDown() {
 
 // Función auxiliar para transponer a una tonalidad específica
 async function transposeToKey(newKey) {
-    if (!currentSong || !currentDisplayedKey) return;
+    if (!currentSong) return;
+    const currentKey = currentSong.tono_original;
 
-    if (currentDisplayedKey === newKey) {
+    if (currentKey === newKey) {
         return; // No hay cambio
     }
 
@@ -287,7 +280,7 @@ async function transposeToKey(newKey) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contenido: currentSong.contenido,
-                tono_original: currentDisplayedKey,
+                tono_original: currentKey,
                 tono_nuevo: newKey,
                 isLatin: false
             })
@@ -297,9 +290,7 @@ async function transposeToKey(newKey) {
             const data = await response.json();
 
             currentSong.contenido = data.contenido;
-            currentDisplayedKey = newKey;
-            document.getElementById('transpositionKey').value = newKey;
-            document.getElementById('targetKey').value = newKey;
+            currentSong.tono_original = newKey;
             displaySongDetail();
         } else {
             const errorText = await response.text();
@@ -313,7 +304,6 @@ async function transposeToKey(newKey) {
     } finally {
         hideLoading();
     }
-}
 }
 
 // Auto-scroll
@@ -333,18 +323,15 @@ function toggleAutoScroll() {
 function startAutoScroll() {
     autoScrollActive = true;
     scrollPaused = false;
-
-    document.getElementById('autoScrollBtn').classList.add('hidden');
-    document.getElementById('pauseScrollBtn').classList.remove('hidden');
-    document.getElementById('mainNav').classList.add('hidden');
+    const autoBtn = document.getElementById('autoToggleBtn');
+    if (autoBtn) autoBtn.textContent = '⏸';
 
     const scrollContent = document.getElementById('songContent');
-    const speed = parseInt(document.getElementById('scrollSpeed').value);
-    const delay = 100 - (speed * 9); // Convertir velocidad a delay
+    const delay = SPEED_DELAYS[speedIndex];
 
     scrollInterval = setInterval(() => {
         if (!scrollPaused) {
-            scrollContent.scrollBy(0, 2);
+            scrollContent.scrollBy(0, 3);
         }
     }, delay);
 }
@@ -353,16 +340,24 @@ function stopAutoScroll() {
     autoScrollActive = false;
     scrollPaused = false;
     clearInterval(scrollInterval);
-
-    document.getElementById('autoScrollBtn').classList.remove('hidden');
-    document.getElementById('pauseScrollBtn').classList.add('hidden');
-    document.getElementById('mainNav').classList.remove('hidden');
+    const autoBtn = document.getElementById('autoToggleBtn');
+    if (autoBtn) autoBtn.textContent = '▶';
 }
 
 function togglePauseScroll() {
     scrollPaused = !scrollPaused;
-    const btn = document.getElementById('pauseScrollBtn');
-    btn.textContent = scrollPaused ? '▶ Reanudar' : '⏸ Pausar';
+    const autoBtn = document.getElementById('autoToggleBtn');
+    if (autoBtn) autoBtn.textContent = scrollPaused ? '▶' : '⏸';
+}
+
+function cycleSpeed() {
+    speedIndex = (speedIndex + 1) % 3;
+    const btn = document.getElementById('speedToggleBtn');
+    if (btn) btn.textContent = ['x1', 'x2', 'x3'][speedIndex];
+    if (autoScrollActive && !scrollPaused) {
+        clearInterval(scrollInterval);
+        startAutoScroll();
+    }
 }
 
 // Crear canción
@@ -459,7 +454,7 @@ async function handleUpdateSong(event) {
         hideLoading();
     }
 }
-}
+
 
 // Eliminar canción
 async function deleteSong(id) {

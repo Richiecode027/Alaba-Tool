@@ -137,11 +137,11 @@
     </style>
 </head>
 <body class="bg-gray-100">
-    <!-- Navegación principal -->
+    <!-- Navegación principal: botones visibles en inicio, ocultada en detalle de canción -->
     <nav id="mainNav" class="bg-red-600 text-white shadow-lg print-hidden">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-bold">🎵 Alaba Tool</h1>
+                <div></div>
                 <div class="space-x-4">
                     <button onclick="showSection('songs-list')" class="px-4 py-2 hover:bg-red-700 rounded">Canciones</button>
                     <button onclick="showSection('new-song')" class="px-4 py-2 hover:bg-red-700 rounded">Nueva Canción</button>
@@ -163,22 +163,21 @@
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-3xl font-bold mb-6 text-gray-800">Mis Canciones</h2>
 
-                <!-- Barra de búsqueda -->
+                <!-- Barra de búsqueda con filtro por género -->
                 <div class="mb-6">
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 items-center">
                         <input
                             type="text"
                             id="searchInput"
-                            placeholder="Buscar por título o autor..."
+                            placeholder="Buscar por título o autor (min 3 letras)..."
                             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
-                            onkeyup="handleSearch()"
+                            oninput="handleSearch()"
                         >
-                        <button onclick="handleSearch()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                            Buscar
-                        </button>
-                        <button onclick="loadAllSongs()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-                            Limpiar
-                        </button>
+                        <select id="genreFilter" onchange="handleSearch()" class="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                            <option value="">Todos los géneros</option>
+                            <option value="Himno">Himno</option>
+                            <option value="Canto">Canto</option>
+                        </select>
                     </div>
                 </div>
 
@@ -255,83 +254,17 @@
         <!-- Sección: Detalle de Canción -->
         <section id="song-detail" class="section-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 print-content" id="songDetailContainer">
-                <div id="songDetailControls" class="print-hidden">
+                <div id="songHeader" class="print-hidden">
                     <h2 id="detailTitle" class="text-3xl font-bold mb-2 text-gray-800">-</h2>
                     <p id="detailAuthor" class="text-gray-600 mb-6">-</p>
+                </div>
 
-                    <!-- Controles de transposición y notación -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-100 p-4 rounded-lg">
-                        <div>
-                            <label class="block text-gray-700 font-bold mb-2">Tono Actual</label>
-                            <select id="transpositionKey" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-600">
-                                <option value="C">C</option>
-                                <option value="C#">C#</option>
-                                <option value="D">D</option>
-                                <option value="D#">D#</option>
-                                <option value="E">E</option>
-                                <option value="F">F</option>
-                                <option value="F#">F#</option>
-                                <option value="G">G</option>
-                                <option value="G#">G#</option>
-                                <option value="A">A</option>
-                                <option value="A#">A#</option>
-                                <option value="B">B</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-gray-700 font-bold mb-2">Transposar a</label>
-                            <select id="targetKey" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-600">
-                                <option value="C">C</option>
-                                <option value="C#">C#</option>
-                                <option value="D">D</option>
-                                <option value="D#">D#</option>
-                                <option value="E">E</option>
-                                <option value="F">F</option>
-                                <option value="F#">F#</option>
-                                <option value="G">G</option>
-                                <option value="G#">G#</option>
-                                <option value="A">A</option>
-                                <option value="A#">A#</option>
-                                <option value="B">B</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Controles de auto-scroll -->
-                    <div class="bg-blue-100 p-4 rounded-lg mb-6 print-hidden">
-                        <h3 class="text-lg font-bold text-blue-900 mb-3">Modo Presentación</h3>
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <button onclick="toggleAutoScroll()" id="autoScrollBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">
-                                ▶ Iniciar Auto-Scroll
-                            </button>
-                            <button onclick="togglePauseScroll()" id="pauseScrollBtn" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 font-bold hidden">
-                                ⏸ Pausar
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Botones de acción -->
-                    <div class="flex gap-4 mb-6 flex-wrap">
-                        <button onclick="editCurrentSong()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">
-                            ✏️ Editar
-                        </button>
-                        <button onclick="printSong()" class="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-bold">
-                            🖨️ Imprimir
-                        </button>
-                        <button onclick="deleteCurrentSong()" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">
-                            🗑️ Eliminar
-                        </button>
-                        <button onclick="showSection('songs-list')" class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 font-bold">
-                            ← Volver
-                        </button>
-                    </div>
-
-                    <hr class="mb-6">
+                <div id="songDetailControls" class="print-hidden hidden">
+                    <!-- Controles reducidos (vacío): las acciones están en el menú hamburguesa inferior -->
                 </div>
 
                 <!-- Contenido de la canción -->
-                <div id="songContent" class="chord-display bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <div id="songContent" class="chord-display p-2 text-lg">
                     <!-- Se llena dinámicamente -->
                 </div>
             </div>
@@ -401,23 +334,31 @@
         </section>
     </div>
 
-    <!-- Botones flotantes de transposición -->
-    <div id="floatingControls" class="fixed right-4 top-1/2 transform -translate-y-1/2 space-y-2 hidden z-40">
-        <button onclick="transposeUp()" class="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 font-bold text-lg flex items-center justify-center" title="Subir tono">
-            +
-        </button>
-        <button onclick="transposeDown()" class="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 font-bold text-lg flex items-center justify-center" title="Bajar tono">
-            −
-        </button>
+    <!-- Floating hamburger menu + auto-scroll button -->
+    <div id="hamburgerContainer" class="hidden fixed right-4 bottom-4 z-50 print-hidden flex items-end gap-3">
+        <!-- Auto-scroll button stays always visible (fuera del menú) -->
+        <button id="autoToggleBtn" onclick="toggleAutoScroll()" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-lg" title="Auto-scroll">▶</button>
+        <!-- Back button placed next to auto-scroll for easier reach -->
+        <button id="detailBackBtn" onclick="showSection('songs-list')" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm flex items-center justify-center" title="Volver">←</button>
+
+        <!-- Hamburger + popover menu -->
+        <div class="relative">
+            <button id="hamburgerBtn" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-2xl">☰</button>
+
+            <div id="hamburgerMenu" class="hidden absolute bottom-16 right-0 bg-white rounded-lg shadow-lg p-3 w-48 space-y-2">
+                <button id="editBtn" onclick="editCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Editar</button>
+                <button id="printBtn" onclick="printSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Imprimir</button>
+                <button id="deleteBtn" onclick="deleteCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Eliminar</button>
+                <div class="flex gap-2 mt-2">
+                    <button id="transposeUpBtn" onclick="transposeUp(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">+ Tono</button>
+                    <button id="transposeDownBtn" onclick="transposeDown(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">− Tono</button>
+                </div>
+                <button id="speedToggleBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">x1</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Control flotante de velocidad -->
-    <div id="speedControl" class="fixed right-4 bottom-4 bg-white rounded-lg shadow-lg p-3 hidden z-40">
-        <div class="text-sm font-bold text-gray-700 mb-2">Velocidad</div>
-        <input type="range" id="scrollSpeed" class="slider" min="1" max="10" value="3" title="Ajusta la velocidad del scroll">
-        <div class="text-xs text-gray-500 mt-1 text-center" id="speedLabel">3</div>
-    </div>
-
+    <script src="app.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
