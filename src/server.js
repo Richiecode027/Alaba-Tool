@@ -30,7 +30,10 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// Bindeamos a 0.0.0.0 para aceptar conexiones desde fuera del contenedor
+// (necesario en Railway, Heroku, Docker, etc.).
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
   console.log('Presiona Ctrl+C para detener el servidor');
 });
