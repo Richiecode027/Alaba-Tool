@@ -1,10 +1,13 @@
 // Variables globales
 let currentSong = null;
 let allSongs = [];
+let setlist = [];
+let draggedSetlistIndex = null;
 let autoScrollActive = false;
 let scrollPaused = false;
 let scrollInterval = null;
 let speedIndex = 1; // 0 -> x1, 1 -> x2, 2 -> x3 (default x2)
+const STORAGE_KEY_SETLIST = 'alabaToolSetlist';
 // Reducir velocidad: hacer que las velocidades sean la mitad de rápidas (duplicar delays)
 const SPEED_DELAYS = [160, 80, 40]; // Delays en ms para cada velocidad
 
@@ -34,8 +37,10 @@ const NOTES_LATIN = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#',
 
 // Cargar todas las canciones al iniciar
 document.addEventListener('DOMContentLoaded', () => {
+    loadSetlistFromStorage();
     loadAllSongs();
     setupEventListeners();
+    renderSetlist();
 });
 
 // Configurar listeners de eventos
@@ -76,6 +81,8 @@ function setupEventListeners() {
             }
         });
     }
+
+    setupSetlistDragAndDrop();
 }
 
 // Mostrar/ocultar secciones
@@ -83,14 +90,18 @@ function showSection(sectionId) {
     document.querySelectorAll('.section-content').forEach(section => {
         section.classList.add('hidden');
     });
-    document.getElementById(sectionId).classList.remove('hidden');
 
-    // Mostrar/ocultar navegación superior y menú hamburguesa en vista de canción
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.classList.remove('hidden');
+    }
+
     const mainNav = document.getElementById('mainNav');
     const hamburgerContainer = document.getElementById('hamburgerContainer');
 
     if (mainNav) mainNav.classList.toggle('hidden', sectionId === 'song-detail');
     if (hamburgerContainer) hamburgerContainer.classList.toggle('hidden', sectionId !== 'song-detail');
+
     const detailBackBtn = document.getElementById('detailBackBtn');
     if (detailBackBtn) detailBackBtn.classList.toggle('hidden', sectionId !== 'song-detail');
 
@@ -182,23 +193,153 @@ function renderSongsList(songs) {
         return;
     }
 
-    container.innerHTML = songs.map(song => `
+    container.innerHTML = songs.map(song => {
+        const alreadyAdded = setlist.some(item => item.id === song.id);
+        return `
         <div class="song-item-hover bg-white border border-gray-200 rounded-lg p-4 cursor-pointer transition" onclick="viewSong(${song.id})">
-            <div class="flex justify-between items-start">
+            <div class="flex justify-between items-start gap-3">
                 <div class="flex-1">
                     <h3 class="text-xl font-bold text-gray-800">${escapeHtml(song.titulo)}</h3>
                     ${song.autor ? `<p class="text-gray-600">Por ${escapeHtml(song.autor)}</p>` : ''}
-                    <div class="flex gap-4 mt-2 text-sm">
+                    <div class="flex gap-4 mt-2 text-sm flex-wrap">
                         ${song.genero ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">${escapeHtml(song.genero)}</span>` : ''}
                         <span class="bg-red-100 text-red-800 px-2 py-1 rounded">Tono: ${song.tono_original}</span>
                     </div>
                 </div>
-                <button onclick="event.stopPropagation(); deleteSong(${song.id})" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
-                    Eliminar
-                </button>
+                <div class="flex flex-col gap-2 items-end">
+                    <button onclick="event.stopPropagation(); addSongToSetlist(${song.id})" class="px-3 py-1 ${alreadyAdded ? 'bg-gray-300 text-gray-700 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'} rounded text-sm" ${alreadyAdded ? 'disabled' : ''}>
+                        ${alreadyAdded ? 'Añadido' : 'Agregar'}
+                    </button>
+                    <button onclick="event.stopPropagation(); deleteSong(${song.id})" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+function loadSetlistFromStorage() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY_SETLIST);
+        if (saved) {
+            setlist = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('Error cargando el setlist desde localStorage:', error);
+        setlist = [];
+    }
+}
+
+function saveSetlist() {
+    localStorage.setItem(STORAGE_KEY_SETLIST, JSON.stringify(setlist));
+}
+
+function renderSetlist() {
+    const container = document.getElementById('setlistItems');
+    if (!container) return;
+
+    if (setlist.length === 0) {
+        container.innerHTML = '<div class="text-gray-500">Tu set list está vacío. Agrega canciones desde la lista de canciones.</div>';
+        return;
+    }
+
+    container.innerHTML = setlist.map((song, index) => `
+        <div class="setlist-item" draggable="true" data-index="${index}">
+            <div class="flex justify-between items-start gap-4">
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(song.titulo)}</h3>
+                    <p class="text-sm text-gray-600">${song.autor ? `Por ${escapeHtml(song.autor)}` : 'Autor desconocido'}</p>
+                    <div class="flex gap-2 mt-2 text-xs text-gray-500 flex-wrap">
+                        ${song.genero ? `<span class="px-2 py-1 bg-blue-100 rounded">${escapeHtml(song.genero)}</span>` : ''}
+                        <span class="px-2 py-1 bg-red-100 rounded">Tono: ${song.tono_original}</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 items-end">
+                    <button onclick="viewSong(${song.id})" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Ver</button>
+                    <button onclick="removeSongFromSetlist(${index})" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Eliminar</button>
+                </div>
             </div>
         </div>
     `).join('');
+}
+
+function addSongToSetlist(id) {
+    const existing = setlist.some(item => item.id === id);
+    if (existing) {
+        return;
+    }
+
+    const song = allSongs.find(s => s.id === id) || (currentSong && currentSong.id === id ? currentSong : null);
+    if (!song) {
+        alert('No se pudo agregar la canción al set list. Intenta nuevamente.');
+        return;
+    }
+
+    setlist.push(song);
+    saveSetlist();
+    renderSetlist();
+    renderSongsList(allSongs);
+}
+
+function removeSongFromSetlist(index) {
+    setlist.splice(index, 1);
+    saveSetlist();
+    renderSetlist();
+    renderSongsList(allSongs);
+}
+
+function clearSetlist() {
+    if (!confirm('¿Deseas vaciar todo el set list?')) {
+        return;
+    }
+    setlist = [];
+    saveSetlist();
+    renderSetlist();
+    renderSongsList(allSongs);
+}
+
+function setupSetlistDragAndDrop() {
+    const container = document.getElementById('setlistItems');
+    if (!container) return;
+
+    container.addEventListener('dragstart', (event) => {
+        const item = event.target.closest('.setlist-item');
+        if (!item) return;
+        draggedSetlistIndex = Number(item.dataset.index);
+        event.dataTransfer.effectAllowed = 'move';
+        item.classList.add('dragging');
+    });
+
+    container.addEventListener('dragend', (event) => {
+        const item = event.target.closest('.setlist-item');
+        if (item) {
+            item.classList.remove('dragging');
+        }
+        draggedSetlistIndex = null;
+    });
+
+    container.addEventListener('dragover', (event) => {
+        event.preventDefault();
+    });
+
+    container.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const targetItem = event.target.closest('.setlist-item');
+        if (!targetItem || draggedSetlistIndex === null) return;
+
+        let targetIndex = Number(targetItem.dataset.index);
+        if (isNaN(targetIndex)) return;
+
+        const movedSong = setlist.splice(draggedSetlistIndex, 1)[0];
+        if (draggedSetlistIndex < targetIndex) {
+            targetIndex -= 1;
+        }
+        setlist.splice(targetIndex, 0, movedSong);
+        saveSetlist();
+        renderSetlist();
+    });
 }
 
 // Ver una canción

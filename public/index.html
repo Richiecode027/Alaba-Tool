@@ -134,6 +134,24 @@
         .song-item-hover:hover {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
+        .setlist-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            background: #fefefe;
+            cursor: grab;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .setlist-item.dragging {
+            opacity: 0.6;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .setlist-item:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -147,6 +165,7 @@
                 </div>
                 <div class="space-x-4">
                     <button onclick="showSection('songs-list')" class="px-4 py-2 hover:bg-red-700 rounded">Canciones</button>
+                    <button onclick="showSection('setlist')" class="px-4 py-2 hover:bg-red-700 rounded">Set list</button>
                     <button onclick="showSection('new-song')" class="px-4 py-2 hover:bg-red-700 rounded">Nueva Canción</button>
                 </div>
             </div>
@@ -187,6 +206,27 @@
                 <div id="songsList" class="space-y-4">
                     <div class="text-center text-gray-500">Cargando canciones...</div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Sección: Set list -->
+        <section id="setlist" class="section-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800">Set list</h2>
+                        <p class="text-gray-600 mt-2">Selecciona canciones de tu biblioteca y ordénalas libremente para tu presentación.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="clearSetlist()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Vaciar Set list</button>
+                    </div>
+                </div>
+
+                <div id="setlistItems" class="space-y-3">
+                    <div class="text-gray-500">Tu set list está vacío. Agrega canciones desde la lista de canciones.</div>
+                </div>
+
+                <p class="text-sm text-gray-500 mt-4">Arrastra las canciones para cambiar el orden. Presiona "Ver" para ver la canción.</p>
             </div>
         </section>
 
@@ -360,7 +400,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
