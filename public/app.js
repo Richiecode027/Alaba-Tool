@@ -8,8 +8,13 @@ let scrollPaused = false;
 let scrollInterval = null;
 let speedIndex = 1; // 0 -> x1, 1 -> x2, 2 -> x3 (default x2)
 const STORAGE_KEY_SETLIST = 'alabaToolSetlist';
-// Reducir velocidad: hacer que las velocidades sean la mitad de rápidas (duplicar delays)
-const SPEED_DELAYS = [160, 80, 40]; // Delays en ms para cada velocidad
+// Velocidades de auto-scroll (más lentas: delays mayores = desplazamiento más lento)
+const SPEED_DELAYS = [600, 300, 150]; // Delays en ms para cada velocidad
+// Estado para distinguir toque corto (abrir) vs arrastre/long-press
+let setlistIsDragging = false;
+let setlistLongPressTimer = null;
+// Animación: id de la canción que se acaba de mover
+let lastMovedSongId = null;
 
 // Indicador de carga
 function showLoading() {
@@ -81,6 +86,24 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Asegurar que la página tenga un estado base para controlar el botón atrás
+    try {
+        history.replaceState({page: 'home'}, '', location.href);
+    } catch (err) {
+        // ignore
+    }
+
+    // Interceptar popstate (botón atrás) para navegar a inicio en lugar de salir de la app
+    window.addEventListener('popstate', (e) => {
+        const state = e.state;
+        const songDetailVisible = document.getElementById('song-detail') && !document.getElementById('song-detail').classList.contains('hidden');
+        if (songDetailVisible) {
+            showSection('songs-list');
+            // dejar un estado home en el historial para evitar salir con otro back
+            try { history.replaceState({page: 'home'}, '', location.href); } catch (err) {}
+        }
+    });
 
     setupSetlistDragAndDrop();
 }
@@ -246,7 +269,7 @@ function renderSetlist() {
     }
 
     container.innerHTML = setlist.map((song, index) => `
-        <div class="setlist-item" draggable="true" data-index="${index}">
+        <div class="setlist-item ${song.id === lastMovedSongId ? 'just-moved' : ''}" draggable="true" data-index="${index}" data-id="${song.id}">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex-1">
                     <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(song.titulo)}</h3>
@@ -337,9 +360,57 @@ function setupSetlistDragAndDrop() {
             targetIndex -= 1;
         }
         setlist.splice(targetIndex, 0, movedSong);
+        // Marcar cuál canción se movió para dar feedback visual
+        lastMovedSongId = movedSong.id;
         saveSetlist();
         renderSetlist();
+        // Limpiar la marca después de la animación
+        setTimeout(() => {
+            lastMovedSongId = null;
+            renderSetlist();
+        }, 700);
     });
+    
+    // Click corto: abrir canción (si no se está arrastrando)
+    container.addEventListener('click', (e) => {
+        if (setlistIsDragging) {
+            e.preventDefault();
+            return;
+        }
+        const item = e.target.closest('.setlist-item');
+        if (!item) return;
+        const id = item.dataset.id;
+        if (id) {
+            viewSong(Number(id));
+        }
+    });
+
+    // Soporte táctil: detectar toque sostenido (long-press) para activar modo arrastre y evitar que un toque corto abra la canción
+    container.addEventListener('touchstart', (e) => {
+        const item = e.target.closest('.setlist-item');
+        if (!item) return;
+        clearTimeout(setlistLongPressTimer);
+        setlistLongPressTimer = setTimeout(() => {
+            setlistIsDragging = true;
+            draggedSetlistIndex = Number(item.dataset.index);
+            item.classList.add('dragging');
+            // marcar como draggable por si el navegador lo soporta
+            item.setAttribute('draggable', 'true');
+        }, 350); // 350ms para long-press
+    }, {passive: true});
+
+    container.addEventListener('touchend', (e) => {
+        clearTimeout(setlistLongPressTimer);
+        // si estaba en modo arrastre, esperar un pequeño lapso antes de resetear para evitar clicks falsos
+        if (setlistIsDragging) {
+            setTimeout(() => { setlistIsDragging = false; }, 100);
+        }
+    });
+
+    container.addEventListener('touchmove', (e) => {
+        // si se mueve el dedo, cancelar el long-press (no abrir la canción)
+        clearTimeout(setlistLongPressTimer);
+    }, {passive: true});
 }
 
 // Ver una canción
@@ -351,6 +422,12 @@ async function viewSong(id) {
         // Mostrar la canción
         displaySongDetail();
         showSection('song-detail');
+        // Añadir entrada de historial para interceptar botón atrás del teléfono
+        try {
+            history.pushState({page: 'song', songId: id}, '', '#song-' + id);
+        } catch (err) {
+            // ignore
+        }
     } catch (error) {
         console.error('Error al cargar canción:', error);
         alert('Error al cargar la canción');

@@ -152,6 +152,17 @@
         .setlist-item:hover {
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
         }
+        /* Animación visual cuando un item se reordena */
+        .setlist-item.just-moved {
+            animation: moveHighlight 700ms ease;
+            box-shadow: 0 8px 24px rgba(14, 116, 144, 0.08);
+        }
+
+        @keyframes moveHighlight {
+            0% { transform: translateY(-10px); background-color: #ffffff; }
+            40% { transform: translateY(6px); background-color: #effafa; }
+            100% { transform: translateY(0); background-color: #ffffff; }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
