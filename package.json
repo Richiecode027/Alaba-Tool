@@ -4,7 +4,7 @@
   "description": "Aplicación web para gestionar cifrados musicales",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/initDatabase.js && node src/server.js",
     "dev": "node src/server.js",
     "init-db": "node src/initDatabase.js"
   },

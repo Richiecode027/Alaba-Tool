@@ -1,45 +1,59 @@
 const { Client } = require('pg');
 require('dotenv').config();
 
-const client = new Client({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: 'postgres'  // Conectarse a la BD por defecto primero
-});
+// Helper: construye config de conexión preferiendo DATABASE_URL.
+function buildConfig(databaseOverride) {
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('.railway.internal')
+        ? false
+        : { rejectUnauthorized: false }
+    };
+  }
+  return {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: databaseOverride
+  };
+}
 
 async function initDatabase() {
   try {
-    await client.connect();
-    console.log('Conectado a PostgreSQL');
+    let dbClient;
 
-    // Crear la base de datos si no existe
-    const dbName = process.env.DB_NAME;
-    const checkDbQuery = `SELECT 1 FROM pg_database WHERE datname = '${dbName}'`;
-    const result = await client.query(checkDbQuery);
-
-    if (result.rows.length === 0) {
-      console.log(`Creando base de datos ${dbName}...`);
-      await client.query(`CREATE DATABASE ${dbName}`);
-      console.log(`Base de datos ${dbName} creada exitosamente`);
+    if (process.env.DATABASE_URL) {
+      // Producción (Railway): la base ya existe, solo creamos la tabla.
+      console.log('Usando DATABASE_URL (entorno de producción)');
+      dbClient = new Client(buildConfig());
+      await dbClient.connect();
+      console.log('Conectado a Postgres');
     } else {
-      console.log(`Base de datos ${dbName} ya existe`);
+      // Local: nos conectamos primero a la BD por defecto para crear la nuestra.
+      const client = new Client(buildConfig('postgres'));
+      await client.connect();
+      console.log('Conectado a PostgreSQL');
+
+      const dbName = process.env.DB_NAME;
+      const checkDbQuery = `SELECT 1 FROM pg_database WHERE datname = '${dbName}'`;
+      const result = await client.query(checkDbQuery);
+
+      if (result.rows.length === 0) {
+        console.log(`Creando base de datos ${dbName}...`);
+        await client.query(`CREATE DATABASE ${dbName}`);
+        console.log(`Base de datos ${dbName} creada exitosamente`);
+      } else {
+        console.log(`Base de datos ${dbName} ya existe`);
+      }
+
+      await client.end();
+
+      dbClient = new Client(buildConfig(dbName));
+      await dbClient.connect();
+      console.log(`Conectado a ${dbName}`);
     }
-
-    await client.end();
-
-    // Conectarse a la nueva BD
-    const dbClient = new Client({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: dbName
-    });
-
-    await dbClient.connect();
-    console.log(`Conectado a ${dbName}`);
 
     // Crear tabla de canciones
     const createTableQuery = `
