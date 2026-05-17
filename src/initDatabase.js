@@ -60,7 +60,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS canciones (
         id SERIAL PRIMARY KEY,
         titulo VARCHAR(255) NOT NULL,
-        autor VARCHAR(255) NOT NULL,
+        autor VARCHAR(255),
         genero VARCHAR(100),
         tono_original VARCHAR(10) NOT NULL,
         contenido TEXT NOT NULL,
@@ -71,6 +71,11 @@ async function initDatabase() {
 
     await dbClient.query(createTableQuery);
     console.log('Tabla "canciones" creada o ya existe');
+
+    // Migración: si la tabla ya existía con autor NOT NULL, lo aflojamos.
+    // (Idempotente: si ya está nullable, este ALTER no hace nada.)
+    await dbClient.query('ALTER TABLE canciones ALTER COLUMN autor DROP NOT NULL');
+    console.log('Columna "autor" ahora permite NULL');
 
     // Verificar si hay datos
     const countQuery = await dbClient.query('SELECT COUNT(*) FROM canciones');
