@@ -174,10 +174,10 @@
                     <img src="/images/Mr R.jpg" alt="Logo" onclick="openAuthorModal()" class="w-9 h-9 rounded-full object-cover border-2 border-white cursor-pointer hover:opacity-80 transition-opacity">
                     <button onclick="showSection('songs-list')" class="text-xl font-bold hover:opacity-80 transition-opacity">Alaba Tool</button>
                 </div>
-                <div class="space-x-4">
-                    <button onclick="showSection('songs-list')" class="px-4 py-2 hover:bg-red-700 rounded">Canciones</button>
-                    <button onclick="showSection('setlist')" class="px-4 py-2 hover:bg-red-700 rounded">Set list</button>
-                    <button onclick="showSection('new-song')" class="px-4 py-2 hover:bg-red-700 rounded">Nueva Canción</button>
+                <div class="flex gap-1 md:gap-2">
+                    <button onclick="showSection('songs-list')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Canciones</button>
+                    <button onclick="showSection('setlist')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Set list</button>
+                    <button onclick="showSection('new-song')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Nueva</button>
                 </div>
             </div>
         </div>
@@ -411,13 +411,13 @@
     </div>
 
     <!-- Modal: Sobre el autor -->
-    <div id="authorModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            <div class="bg-red-600 flex flex-col items-center py-6 px-4">
-                <img src="/images/Mr R.jpg" alt="Ricardo Juárez" class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg mb-3">
+    <div id="authorModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-y-auto max-h-full">
+            <div class="bg-red-600 flex flex-col items-center py-5 px-4">
+                <img src="/images/Mr R.jpg" alt="Ricardo Juárez" class="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg mb-3">
                 <h2 class="text-white text-2xl font-bold">Sobre el Autor</h2>
             </div>
-            <div class="p-6 text-center">
+            <div class="p-5 text-center">
                 <p class="text-gray-700 text-base leading-relaxed mb-2">
                     El autor de esta app <strong>Ricardo Juárez</strong> es:
                 </p>
