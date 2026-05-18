@@ -291,8 +291,8 @@ function renderSetlist() {
                     </div>
                 </div>
                 <div class="flex flex-col gap-2 items-end">
-                    <button onclick="viewSong(${song.id})" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Ver</button>
-                    <button onclick="removeSongFromSetlist(${index})" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Eliminar</button>
+                    <button onclick="event.stopPropagation(); viewSong(${song.id})" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Ver</button>
+                    <button onclick="event.stopPropagation(); removeSongFromSetlist(${index})" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Eliminar</button>
                 </div>
             </div>
         </div>
