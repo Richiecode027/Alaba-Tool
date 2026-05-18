@@ -355,10 +355,8 @@ function setupSetlistDragAndDrop() {
         let targetIndex = Number(targetItem.dataset.index);
         if (isNaN(targetIndex)) return;
 
+        if (draggedSetlistIndex === targetIndex) return;
         const movedSong = setlist.splice(draggedSetlistIndex, 1)[0];
-        if (draggedSetlistIndex < targetIndex) {
-            targetIndex -= 1;
-        }
         setlist.splice(targetIndex, 0, movedSong);
         // Marcar cuál canción se movió para dar feedback visual
         lastMovedSongId = movedSong.id;
