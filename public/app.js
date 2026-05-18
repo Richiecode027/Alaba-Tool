@@ -108,6 +108,17 @@ function setupEventListeners() {
     setupSetlistDragAndDrop();
 }
 
+// Modal "Sobre el autor"
+function openAuthorModal() {
+    document.getElementById('authorModal').classList.remove('hidden');
+}
+function closeAuthorModal() {
+    document.getElementById('authorModal').classList.add('hidden');
+}
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'authorModal') closeAuthorModal();
+});
+
 // Mostrar/ocultar secciones
 function showSection(sectionId) {
     document.querySelectorAll('.section-content').forEach(section => {
