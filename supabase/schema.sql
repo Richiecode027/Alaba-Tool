@@ -160,10 +160,11 @@ grant update (titulo, autor, genero, tono_original, contenido) on public.alaba_c
 --      Email:    tuusuario@alaba.invalid   (usuario: 3-30 de a-z 0-9 . _ -)
 --      Password: la que quieras (mínimo 8)
 --      Marca "Auto Confirm User".
--- 2. Cambia "tuusuario" y ejecuta:
+-- 2. Ejecuta también migration-2-en-vivo.sql y migration-3-nombres.sql.
+-- 3. Cambia "tuusuario" y ejecuta:
 --
---   insert into public.alaba_miembros (user_id, usuario, rol)
---   select id, split_part(email, '@', 1), 'admin'
+--   insert into public.alaba_miembros (user_id, usuario, rol, nombre)
+--   select id, split_part(email, '@', 1), 'admin', initcap(split_part(email, '@', 1))
 --   from auth.users where email = 'tuusuario@alaba.invalid'
 --   on conflict (user_id) do update set rol = 'admin';
 --

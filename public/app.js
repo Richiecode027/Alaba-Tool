@@ -47,7 +47,8 @@ const ROLE_LEVEL = { lector: 1, editor: 2, admin: 3 };
 const ROLE_LABEL = { lector: 'Lector', editor: 'Editor', admin: 'Administrador' };
 let currentUser = null;
 let currentRole = null;
-let currentUsername = null;
+let currentUsername = null;     // para entrar (minúsculas): "ricardo"
+let currentDisplayName = null;  // para mostrar: "Ricardo"
 
 function can(minRole) {
     return (ROLE_LEVEL[currentRole] || 0) >= ROLE_LEVEL[minRole];
@@ -85,10 +86,17 @@ function usernameFromEmail(email) {
     return (email || '').split('@')[0];
 }
 
+// Nombre para mostrar: el guardado o, si no hay, el usuario con mayúscula inicial
+// ("juan.perez" → "Juan Perez")
+function displayName(member) {
+    if (member && member.nombre && member.nombre.trim()) return member.nombre.trim();
+    return (member?.usuario || '').replace(/[._]/g, ' ').replace(/\S+/g, w => w[0].toUpperCase() + w.slice(1));
+}
+
 // Tras iniciar sesión: averiguar el rol en Alaba Tool y arrancar la app
 async function startApp(user) {
     currentUser = user;
-    const { data, error } = await sb.from('alaba_miembros').select('rol, usuario').eq('user_id', user.id).maybeSingle();
+    const { data, error } = await sb.from('alaba_miembros').select('*').eq('user_id', user.id).maybeSingle();
 
     if (error || !data) {
         currentRole = null;
@@ -100,8 +108,10 @@ async function startApp(user) {
 
     currentRole = data.rol;
     currentUsername = data.usuario;
+    currentDisplayName = displayName(data);
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
+    document.getElementById('accountName').value = currentDisplayName;
     document.getElementById('accountUsername').textContent = data.usuario;
     document.getElementById('accountRole').textContent = ROLE_LABEL[currentRole];
     applyRolePermissions();
@@ -167,8 +177,8 @@ async function handleChangePassword(event) {
     const password = document.getElementById('newPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
 
-    if (password.length < 8) {
-        alert('La contraseña debe tener al menos 8 caracteres');
+    if (password.length < 8 || password.length > 72) {
+        alert('La contraseña debe tener entre 8 y 72 caracteres');
         return;
     }
     if (password !== confirmPassword) {
@@ -184,6 +194,28 @@ async function handleChangePassword(event) {
         closeAccountModal();
     } catch (error) {
         alert(`No se pudo cambiar la contraseña: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function handleChangeName(event) {
+    event.preventDefault();
+    const nombre = document.getElementById('accountName').value.trim();
+    if (!nombre || nombre.length > 60) {
+        alert('El nombre debe tener entre 1 y 60 caracteres');
+        return;
+    }
+
+    showLoading();
+    try {
+        const { data, error } = await sb.rpc('alaba_cambiar_mi_nombre', { p_nombre: nombre });
+        if (error) throw error;
+        currentDisplayName = data;
+        document.getElementById('accountName').value = data;
+        alert('Nombre actualizado');
+    } catch (error) {
+        alert(`No se pudo cambiar el nombre: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -343,9 +375,9 @@ function showSection(sectionId) {
 async function loadAllSongs() {
     showLoading();
     try {
-        const { data, error } = await sb.from(SONGS_TABLE).select('*').order('fecha_creacion', { ascending: false });
+        const { data, error } = await sb.from(SONGS_TABLE).select('*');
         if (error) throw error;
-        allSongs = data;
+        allSongs = data.sort(compareSongTitles);
         handleSearch(); // respeta la búsqueda/filtro que el usuario tenga escritos
     } catch (error) {
         console.error('Error al cargar canciones:', error);
@@ -353,6 +385,18 @@ async function loadAllSongs() {
     } finally {
         hideLoading();
     }
+}
+
+// Orden alfabético "natural": los números van por su valor (#2 antes que #10),
+// sin distinguir mayúsculas ni acentos, e ignorando signos iniciales (¿ ¡ ")
+const titleCollator = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
+
+function songSortKey(titulo) {
+    return (titulo || '').replace(/^[\s¿¡"'«(]+/, '');
+}
+
+function compareSongTitles(a, b) {
+    return titleCollator.compare(songSortKey(a.titulo), songSortKey(b.titulo));
 }
 
 // Normaliza texto para buscar sin distinguir mayúsculas ni acentos ("senor" encuentra "Señor")

@@ -529,16 +529,20 @@
 
                 <form id="newMemberForm" onsubmit="handleCreateMember(event)" class="border border-gray-200 rounded-lg p-4 mb-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-3">Dar de alta</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                         <div>
-                            <label for="memberUsername" class="block text-gray-700 font-bold mb-2">Usuario</label>
+                            <label for="memberName" class="block text-gray-700 font-bold mb-2">Nombre para mostrar</label>
+                            <input type="text" id="memberName" maxlength="60" autocomplete="off" placeholder="ej. Juan Pérez (opcional)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                        </div>
+                        <div>
+                            <label for="memberUsername" class="block text-gray-700 font-bold mb-2">Usuario para entrar</label>
                             <input type="text" id="memberUsername" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                                    minlength="3" maxlength="30" pattern="[A-Za-z0-9._\-]{3,30}" placeholder="ej. juan.perez"
                                    title="3 a 30 caracteres: letras, números, punto, guion y guion bajo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
                         </div>
                         <div>
                             <label for="memberPassword" class="block text-gray-700 font-bold mb-2">Contraseña temporal</label>
-                            <input type="text" id="memberPassword" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                            <input type="text" id="memberPassword" required minlength="8" maxlength="72" autocomplete="new-password" placeholder="8 a 72 caracteres" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
                         </div>
                         <div>
                             <label for="memberRole" class="block text-gray-700 font-bold mb-2">Rol</label>
@@ -549,7 +553,7 @@
                             </select>
                         </div>
                     </div>
-                    <p class="text-sm text-gray-500 mb-3">Si el usuario ya existe, se le pone esta contraseña y el rol elegido (útil si olvidó su contraseña).</p>
+                    <p class="text-sm text-gray-500 mb-3">Si no pones nombre, se usa el usuario con mayúscula inicial (juan.perez → Juan Perez). Para cambiar después la contraseña o el nombre de alguien, usa los botones de su fila.</p>
                     <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">Dar acceso</button>
                 </form>
 
@@ -621,13 +625,25 @@
     <div id="accountModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden p-4" onclick="if (event.target === this) closeAccountModal()">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-y-auto max-h-full p-6">
             <h2 class="text-2xl font-bold text-gray-800 mb-1">Mi cuenta</h2>
-            <p id="accountUsername" class="text-gray-700 break-all"></p>
-            <p class="text-sm text-gray-500 mb-6">Rol: <span id="accountRole" class="font-semibold"></span></p>
+            <p class="text-sm text-gray-500 mb-6">
+                Usuario para entrar: <span id="accountUsername" class="font-semibold text-gray-700 break-all"></span> ·
+                Rol: <span id="accountRole" class="font-semibold text-gray-700"></span>
+            </p>
+
+            <form onsubmit="handleChangeName(event)" class="space-y-3 mb-6">
+                <label for="accountName" class="block font-semibold text-gray-800">Nombre para mostrar</label>
+                <div class="flex gap-2">
+                    <input type="text" id="accountName" required maxlength="60" autocomplete="name" class="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                    <button type="submit" class="shrink-0 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Guardar</button>
+                </div>
+                <p class="text-xs text-gray-500">Es el que ven los demás (por ejemplo, "Siguiendo a Ricardo").</p>
+            </form>
 
             <form id="changePasswordForm" onsubmit="handleChangePassword(event)" class="space-y-3 mb-6">
                 <h3 class="font-semibold text-gray-800">Cambiar contraseña</h3>
-                <input type="password" id="newPassword" required minlength="8" autocomplete="new-password" placeholder="Nueva contraseña (mín. 8)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
-                <input type="password" id="confirmPassword" required minlength="8" autocomplete="new-password" placeholder="Repite la contraseña" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <input type="password" id="newPassword" required minlength="8" maxlength="72" autocomplete="new-password" placeholder="Nueva contraseña (8 a 72 caracteres)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <input type="password" id="confirmPassword" required minlength="8" maxlength="72" autocomplete="new-password" placeholder="Repite la contraseña" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <p class="text-xs text-gray-500">Solo para Alaba Tool: usa una distinta a la de tu cuenta de Supabase o de otras apps.</p>
                 <button type="submit" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Guardar contraseña</button>
             </form>
 

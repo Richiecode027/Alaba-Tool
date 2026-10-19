@@ -5,7 +5,9 @@
  *
  *   POST /api/admin/usuarios
  *   Authorization: Bearer <access_token de un admin de Alaba Tool>
- *   { usuario, password, rol }  → { ok: true, creada: boolean }
+ *   { usuario, password, rol, nombre? }              → alta (o re-alta)
+ *   { accion: 'contrasena', usuario, password }      → solo cambia la contraseña
+ *   → { ok: true, creada: boolean }
  *
  * Se entra con nombre de usuario; en Auth cada uno se guarda como
  * <usuario>@alaba.invalid (mismo dominio que USER_DOMAIN en public/config.js).
@@ -22,6 +24,10 @@ import { createClient } from '@supabase/supabase-js';
 const USER_DOMAIN = 'alaba.invalid';
 const ROLES = ['lector', 'editor', 'admin'];
 const USUARIO_RE = /^[a-z0-9._-]{3,30}$/;
+
+// "juan.perez" → "Juan Perez" (igual que initcap en migration-3-nombres.sql)
+const defaultDisplayName = (usuario) =>
+  usuario.replace(/[._]/g, ' ').replace(/\S+/g, w => w[0].toUpperCase() + w.slice(1));
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
@@ -58,22 +64,38 @@ export default async (req) => {
     return json({ error: 'Cuerpo JSON inválido' }, 400);
   }
 
+  const accion = body.accion === 'contrasena' ? 'contrasena' : 'alta';
   const usuario = String(body.usuario || '').trim().toLowerCase();
   const password = String(body.password || '');
   const rol = body.rol;
+  const nombre = String(body.nombre || '').trim();
 
   if (!USUARIO_RE.test(usuario)) {
     return json({ error: 'Usuario inválido: de 3 a 30 caracteres, solo letras minúsculas, números, punto, guion y guion bajo' }, 400);
   }
   if (password.length < 8) return json({ error: 'La contraseña debe tener al menos 8 caracteres' }, 400);
-  if (!ROLES.includes(rol)) return json({ error: 'Rol inválido' }, 400);
+  if (password.length > 72) return json({ error: 'La contraseña puede tener como máximo 72 caracteres' }, 400);
+  if (accion === 'alta' && !ROLES.includes(rol)) return json({ error: 'Rol inválido' }, 400);
+  if (nombre.length > 60) return json({ error: 'El nombre puede tener como máximo 60 caracteres' }, 400);
 
   const email = `${usuario}@${USER_DOMAIN}`;
 
   const { data: existingId, error: lookupError } = await sb.rpc('alaba_usuario_por_email', { p_email: email });
   if (lookupError) return json({ error: 'No se pudo buscar el usuario' }, 500);
 
-  if (existingId === caller.id) return json({ error: 'No puedes cambiar tu propio rol ni tu contraseña desde aquí' }, 400);
+  if (existingId === caller.id) {
+    return json({ error: 'Tu propia contraseña cámbiala en "Mi cuenta"; tu rol no se puede cambiar desde aquí' }, 400);
+  }
+
+  // Solo cambiar la contraseña de un usuario que ya tiene acceso
+  if (accion === 'contrasena') {
+    if (!existingId) return json({ error: 'Ese usuario no existe' }, 404);
+    const { data: member } = await sb.from('alaba_miembros').select('user_id').eq('user_id', existingId).maybeSingle();
+    if (!member) return json({ error: 'Ese usuario no tiene acceso a Alaba Tool' }, 404);
+    const { error } = await sb.auth.admin.updateUserById(existingId, { password });
+    if (error) return json({ error: `No se pudo cambiar la contraseña: ${error.message}` }, 400);
+    return json({ ok: true, creada: false });
+  }
 
   let userId = existingId;
   let creada = false;
@@ -88,9 +110,18 @@ export default async (req) => {
     creada = true;
   }
 
+  // Nombre para mostrar: el indicado, o el usuario con mayúscula inicial
+  // (al volver a dar de alta a alguien sin indicar nombre, se conserva el que tenía)
+  const fila = { user_id: userId, usuario, rol };
+  if (nombre) {
+    fila.nombre = nombre;
+  } else if (creada || !(await sb.from('alaba_miembros').select('user_id').eq('user_id', userId).maybeSingle()).data) {
+    fila.nombre = defaultDisplayName(usuario);
+  }
+
   const { error: memberError } = await sb
     .from('alaba_miembros')
-    .upsert({ user_id: userId, usuario, rol }, { onConflict: 'user_id' });
+    .upsert(fila, { onConflict: 'user_id' });
   if (memberError) return json({ error: 'No se pudo asignar el rol' }, 500);
 
   return json({ ok: true, creada });

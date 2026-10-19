@@ -126,7 +126,7 @@ async function startLeading() {
         await subscribed;
         // Supabase solo manda la lista de presentes a quien ya se registró en ella,
         // así que primero se registra como "observador" (no cuenta como músico)
-        await live.channel.track({ usuario: currentUsername, lider: false, conectando: true });
+        await live.channel.track({ usuario: currentDisplayName, lider: false, conectando: true });
         await Promise.race([firstSync, new Promise(resolve => setTimeout(resolve, 3000))]);
         if (live.mode !== 'connecting') return; // se canceló mientras tanto
 
@@ -138,7 +138,7 @@ async function startLeading() {
 
         live.mode = 'leader';
         live.startedAt = Date.now();
-        await live.channel.track({ usuario: currentUsername, lider: true });
+        await live.channel.track({ usuario: currentDisplayName, lider: true });
         sendLiveState(true);
         live.heartbeat = setInterval(() => sendLiveState(true), LIVE_HEARTBEAT_MS);
 
@@ -202,7 +202,7 @@ function sendLiveState(force = false) {
         event: 'estado',
         payload: {
             leaderId: live.clientId,
-            leaderName: currentUsername,
+            leaderName: currentDisplayName,
             startedAt: live.startedAt,
             songId: currentSong.id,
             tono: currentSong.tono_original,
@@ -261,7 +261,7 @@ async function startFollowing() {
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    await live.channel.track({ usuario: currentUsername, lider: false });
+                    await live.channel.track({ usuario: currentDisplayName, lider: false });
                     if (!live.leaderId) setLiveStatus('Esperando a que el líder empiece a dirigir…');
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                     liveConnectionFailed();

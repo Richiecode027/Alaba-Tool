@@ -38,10 +38,11 @@ Supabase (proyecto compartido con PSI, Arcade y Nupcia)
 
 - No hay registro público: los usuarios los da de alta un Administrador, con una contraseña temporal.
 - Usuarios válidos: de 3 a 30 caracteres, con minúsculas, números, `.`, `_` y `-`. Se guardan en minúsculas.
-- **¿Alguien olvidó su contraseña?** El Administrador lo vuelve a dar de alta con una contraseña nueva; se le restablece.
+- **Nombre para mostrar:** cada usuario tiene uno ("Ricardo", "Juan Pérez"), que es el que se ve en la app. El usuario para entrar sigue en minúsculas y da igual cómo se escriba al iniciar sesión.
+- **¿Alguien olvidó su contraseña?** En **Usuarios**, el Administrador pulsa **Contraseña** en su fila y le pone una nueva.
 - "Quitar acceso" solo le impide entrar; se le puede volver a dar de alta cuando quieras.
 - Un Administrador no puede cambiar ni quitar su propio rol (así no te quedas fuera por accidente).
-- Cada usuario puede cambiar su contraseña en **Mi cuenta**.
+- Cada usuario puede cambiar su nombre y su contraseña en **Mi cuenta**. Las contraseñas van de 8 a 72 caracteres (el máximo lo pone Supabase).
 
 ## Puesta en marcha (una sola vez)
 
@@ -53,6 +54,8 @@ En Supabase → **SQL Editor** → New query, pega el contenido de [supabase/sch
 
 Para el modo **En vivo**, ejecuta además [supabase/migration-2-en-vivo.sql](supabase/migration-2-en-vivo.sql). Crea las políticas del canal privado de Realtime: escucha cualquier miembro y transmiten solo editores y administradores.
 
+Después ejecuta [supabase/migration-3-nombres.sql](supabase/migration-3-nombres.sql), que agrega el nombre para mostrar.
+
 ### 2. Primer Administrador
 
 1. En Supabase → **Authentication → Users → Add user → Create new user**:
@@ -62,8 +65,8 @@ Para el modo **En vivo**, ejecuta además [supabase/migration-2-en-vivo.sql](sup
 2. En el SQL Editor, cambia `tuusuario` y ejecuta:
 
 ```sql
-insert into public.alaba_miembros (user_id, usuario, rol)
-select id, split_part(email, '@', 1), 'admin'
+insert into public.alaba_miembros (user_id, usuario, rol, nombre)
+select id, split_part(email, '@', 1), 'admin', initcap(split_part(email, '@', 1))
 from auth.users where email = 'tuusuario@alaba.invalid'
 on conflict (user_id) do update set rol = 'admin';
 ```
