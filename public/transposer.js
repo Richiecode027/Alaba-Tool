@@ -1,7 +1,11 @@
 /**
  * Módulo de transposición de acordes musicales
  * Soporta notación anglosajona (C, C#, D, etc.) y latina (Do, Re, Mi, etc.)
+ *
+ * Corre en el navegador (expone window.Transposer) y en Node (module.exports),
+ * así los tests pueden usar el mismo archivo que la app.
  */
+(function (root) {
 
 // Notas en notación anglosajona
 const NOTES_ENGLISH = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -193,18 +197,23 @@ function transposeChord(chord, semitones, isLatin = false) {
  * @returns {number} - Número de semitonos a transportar
  */
 function getSemitonesBetween(fromNote, toNote, isLatin = false) {
-  const from = isLatin ? normalizeNoteLatin(fromNote) : normalizeNote(fromNote);
-  const to = isLatin ? normalizeNoteLatin(toNote) : normalizeNote(toNote);
+  // Extrae solo la nota raíz del tono (ignora sufijos como "m", "maj7", etc.)
+  // para que tonos menores (Em) o con bemol (Bb) se calculen correctamente.
+  const rootIndex = (note) => {
+    const parsed = isLatin ? parseChordLatin(note) : parseChord(note);
+    const root = parsed ? parsed.root : note;
+    const normalized = isLatin ? normalizeNoteLatin(root) : normalizeNote(root);
+    return getNoteIndex(normalized, isLatin);
+  };
 
-  const fromIndex = getNoteIndex(from, isLatin);
-  const toIndex = getNoteIndex(to, isLatin);
+  const fromIndex = rootIndex(fromNote);
+  const toIndex = rootIndex(toNote);
 
   if (fromIndex === -1 || toIndex === -1) {
     return 0;
   }
 
-  const semitones = toIndex - fromIndex;
-  return semitones;
+  return toIndex - fromIndex;
 }
 
 /**
@@ -277,7 +286,7 @@ function extractChords(content) {
   return Array.from(chords);
 }
 
-module.exports = {
+const api = {
   transposeChord,
   transposeSong,
   getSemitonesBetween,
@@ -289,3 +298,10 @@ module.exports = {
   parseChord,
   parseChordLatin
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = api;
+} else {
+  root.Transposer = api;
+}
+})(typeof globalThis !== 'undefined' ? globalThis : this);

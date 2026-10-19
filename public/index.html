@@ -166,18 +166,53 @@
     </style>
 </head>
 <body class="bg-gray-100">
+    <!-- Pantalla de inicio de sesión (también muestra el aviso de "sin acceso") -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div class="bg-red-600 flex flex-col items-center py-6 px-4">
+                <img src="/images/Mr R.jpg" alt="Logo" class="w-16 h-16 rounded-full object-cover border-4 border-white shadow mb-3">
+                <h1 class="text-white text-2xl font-bold">Alaba Tool</h1>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div>
+                    <label for="loginUsername" class="block text-gray-700 font-bold mb-2">Usuario</label>
+                    <input type="text" id="loginUsername" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                </div>
+                <div>
+                    <label for="loginPassword" class="block text-gray-700 font-bold mb-2">Contraseña</label>
+                    <input type="password" id="loginPassword" required autocomplete="current-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                </div>
+                <p id="loginError" class="hidden text-sm text-red-600"></p>
+                <button type="submit" class="w-full px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">Entrar</button>
+                <p class="text-xs text-gray-500 text-center">¿No tienes cuenta? Pídela a un administrador.</p>
+            </form>
+
+            <div id="noAccessPanel" class="hidden p-6 space-y-4 text-center">
+                <p id="noAccessMessage" class="text-gray-700"></p>
+                <button onclick="logout()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-bold">Cerrar sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App (visible solo con sesión y rol en Alaba Tool) -->
+    <div id="app" class="hidden">
     <!-- Navegación principal: botones visibles en inicio, ocultada en detalle de canción -->
     <nav id="mainNav" class="bg-red-600 text-white shadow-lg print-hidden">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <img src="/images/Mr R.jpg" alt="Logo" onclick="openAuthorModal()" class="w-9 h-9 rounded-full object-cover border-2 border-white cursor-pointer hover:opacity-80 transition-opacity">
-                    <button onclick="showSection('songs-list')" class="text-xl font-bold hover:opacity-80 transition-opacity">Alaba Tool</button>
+                    <button onclick="showSection('songs-list')" class="hidden sm:inline text-xl font-bold hover:opacity-80 transition-opacity">Alaba Tool</button>
                 </div>
-                <div class="flex gap-1 md:gap-2">
+                <div class="flex gap-0.5 md:gap-2 items-center whitespace-nowrap">
                     <button onclick="showSection('songs-list')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Canciones</button>
                     <button onclick="showSection('setlist')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Set list</button>
-                    <button onclick="showSection('new-song')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Nueva</button>
+                    <button data-rol="editor" onclick="showSection('new-song')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Nueva</button>
+                    <button data-rol="admin" onclick="showSection('usuarios')" class="px-2 py-1 md:px-4 md:py-2 text-sm md:text-base hover:bg-red-700 rounded">Usuarios</button>
+                    <button onclick="openAccountModal()" class="w-9 h-9 flex items-center justify-center hover:bg-red-700 rounded-full" title="Mi cuenta" aria-label="Mi cuenta">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A9 9 0 1118.88 17.8M15 10a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M5.12 17.8A8.97 8.97 0 0012 21a8.97 8.97 0 006.88-3.2C17.3 16.1 14.8 15 12 15s-5.3 1.1-6.88 2.8z"/></svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -201,7 +236,7 @@
                         <input
                             type="text"
                             id="searchInput"
-                            placeholder="Buscar por título o autor (min 3 letras)..."
+                            placeholder="Buscar por título o autor..."
                             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                             oninput="handleSearch()"
                         >
@@ -242,7 +277,7 @@
         </section>
 
         <!-- Sección: Nueva Canción -->
-        <section id="new-song" class="section-content hidden">
+        <section id="new-song" class="section-content hidden" data-requiere="editor">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-3xl font-bold mb-6 text-gray-800">Nueva Canción</h2>
 
@@ -269,18 +304,34 @@
                             <label class="block text-gray-700 font-bold mb-2">Tono Original *</label>
                             <select id="tonoOriginal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
                                 <option value="">Seleccionar tono...</option>
-                                <option value="C">C</option>
-                                <option value="C#">C#</option>
-                                <option value="D">D</option>
-                                <option value="D#">D#</option>
-                                <option value="E">E</option>
-                                <option value="F">F</option>
-                                <option value="F#">F#</option>
-                                <option value="G">G</option>
-                                <option value="G#">G#</option>
-                                <option value="A">A</option>
-                                <option value="A#">A#</option>
-                                <option value="B">B</option>
+                                <optgroup label="Mayores">
+                                    <option value="C">C</option>
+                                    <option value="C#">C#</option>
+                                    <option value="D">D</option>
+                                    <option value="D#">D#</option>
+                                    <option value="E">E</option>
+                                    <option value="F">F</option>
+                                    <option value="F#">F#</option>
+                                    <option value="G">G</option>
+                                    <option value="G#">G#</option>
+                                    <option value="A">A</option>
+                                    <option value="A#">A#</option>
+                                    <option value="B">B</option>
+                                </optgroup>
+                                <optgroup label="Menores">
+                                    <option value="Cm">Cm</option>
+                                    <option value="C#m">C#m</option>
+                                    <option value="Dm">Dm</option>
+                                    <option value="D#m">D#m</option>
+                                    <option value="Em">Em</option>
+                                    <option value="Fm">Fm</option>
+                                    <option value="F#m">F#m</option>
+                                    <option value="Gm">Gm</option>
+                                    <option value="G#m">G#m</option>
+                                    <option value="Am">Am</option>
+                                    <option value="A#m">A#m</option>
+                                    <option value="Bm">Bm</option>
+                                </optgroup>
                             </select>
                         </div>
                     </div>
@@ -323,7 +374,7 @@
         </section>
 
         <!-- Sección: Editar Canción -->
-        <section id="edit-song" class="section-content hidden">
+        <section id="edit-song" class="section-content hidden" data-requiere="editor">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-3xl font-bold mb-6 text-gray-800">Editar Canción</h2>
 
@@ -353,18 +404,34 @@
                     <div class="mb-4">
                         <label class="block text-gray-700 font-bold mb-2">Tono Original *</label>
                         <select id="editTonoOriginal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
-                            <option value="C">C</option>
-                            <option value="C#">C#</option>
-                            <option value="D">D</option>
-                            <option value="D#">D#</option>
-                            <option value="E">E</option>
-                            <option value="F">F</option>
-                            <option value="F#">F#</option>
-                            <option value="G">G</option>
-                            <option value="G#">G#</option>
-                            <option value="A">A</option>
-                            <option value="A#">A#</option>
-                            <option value="B">B</option>
+                            <optgroup label="Mayores">
+                                <option value="C">C</option>
+                                <option value="C#">C#</option>
+                                <option value="D">D</option>
+                                <option value="D#">D#</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="F#">F#</option>
+                                <option value="G">G</option>
+                                <option value="G#">G#</option>
+                                <option value="A">A</option>
+                                <option value="A#">A#</option>
+                                <option value="B">B</option>
+                            </optgroup>
+                            <optgroup label="Menores">
+                                <option value="Cm">Cm</option>
+                                <option value="C#m">C#m</option>
+                                <option value="Dm">Dm</option>
+                                <option value="D#m">D#m</option>
+                                <option value="Em">Em</option>
+                                <option value="Fm">Fm</option>
+                                <option value="F#m">F#m</option>
+                                <option value="Gm">Gm</option>
+                                <option value="G#m">G#m</option>
+                                <option value="Am">Am</option>
+                                <option value="A#m">A#m</option>
+                                <option value="Bm">Bm</option>
+                            </optgroup>
                         </select>
                     </div>
 
@@ -384,6 +451,46 @@
                 </form>
             </div>
         </section>
+
+        <!-- Sección: Usuarios (solo Administrador) -->
+        <section id="usuarios" class="section-content hidden" data-requiere="admin">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-3xl font-bold mb-2 text-gray-800">Usuarios</h2>
+                <p class="text-gray-600 mb-6">
+                    <strong>Lector:</strong> ver, buscar, transponer, imprimir y armar su set list.
+                    <strong>Editor:</strong> además crea, edita y elimina canciones.
+                    <strong>Administrador:</strong> además gestiona usuarios.
+                </p>
+
+                <form id="newMemberForm" onsubmit="handleCreateMember(event)" class="border border-gray-200 rounded-lg p-4 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Dar de alta</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                        <div>
+                            <label for="memberUsername" class="block text-gray-700 font-bold mb-2">Usuario</label>
+                            <input type="text" id="memberUsername" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+                                   minlength="3" maxlength="30" pattern="[A-Za-z0-9._\-]{3,30}" placeholder="ej. juan.perez"
+                                   title="3 a 30 caracteres: letras, números, punto, guion y guion bajo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                        </div>
+                        <div>
+                            <label for="memberPassword" class="block text-gray-700 font-bold mb-2">Contraseña temporal</label>
+                            <input type="text" id="memberPassword" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                        </div>
+                        <div>
+                            <label for="memberRole" class="block text-gray-700 font-bold mb-2">Rol</label>
+                            <select id="memberRole" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                                <option value="lector">Lector</option>
+                                <option value="editor">Editor</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-3">Si el usuario ya existe, se le pone esta contraseña y el rol elegido (útil si olvidó su contraseña).</p>
+                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">Dar acceso</button>
+                </form>
+
+                <div id="membersList" class="space-y-3"></div>
+            </div>
+        </section>
     </div>
 
     <!-- Floating hamburger menu + auto-scroll button -->
@@ -398,9 +505,9 @@
             <button id="hamburgerBtn" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-2xl">☰</button>
 
             <div id="hamburgerMenu" class="hidden absolute bottom-16 right-0 bg-white rounded-lg shadow-lg p-3 w-48 space-y-2">
-                <button id="editBtn" onclick="editCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Editar</button>
+                <button id="editBtn" data-rol="editor" onclick="editCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Editar</button>
                 <button id="printBtn" onclick="printSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Imprimir</button>
-                <button id="deleteBtn" onclick="deleteCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Eliminar</button>
+                <button id="deleteBtn" data-rol="editor" onclick="deleteCurrentSong(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">Eliminar</button>
                 <div class="flex gap-2 mt-2">
                     <button id="transposeUpBtn" onclick="transposeUp(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">+ Tono</button>
                     <button id="transposeDownBtn" onclick="transposeDown(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">− Tono</button>
@@ -436,6 +543,31 @@
         </div>
     </div>
 
+    <!-- Modal: Mi cuenta -->
+    <div id="accountModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden p-4" onclick="if (event.target === this) closeAccountModal()">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-y-auto max-h-full p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">Mi cuenta</h2>
+            <p id="accountUsername" class="text-gray-700 break-all"></p>
+            <p class="text-sm text-gray-500 mb-6">Rol: <span id="accountRole" class="font-semibold"></span></p>
+
+            <form id="changePasswordForm" onsubmit="handleChangePassword(event)" class="space-y-3 mb-6">
+                <h3 class="font-semibold text-gray-800">Cambiar contraseña</h3>
+                <input type="password" id="newPassword" required minlength="8" autocomplete="new-password" placeholder="Nueva contraseña (mín. 8)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <input type="password" id="confirmPassword" required minlength="8" autocomplete="new-password" placeholder="Repite la contraseña" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <button type="submit" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Guardar contraseña</button>
+            </form>
+
+            <div class="flex gap-2">
+                <button onclick="logout()" class="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold">Cerrar sesión</button>
+                <button onclick="closeAccountModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <script src="transposer.js"></script>
     <script src="app.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>
