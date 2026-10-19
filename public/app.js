@@ -613,13 +613,52 @@ function displaySongDetail() {
     document.getElementById('songContent').innerHTML = formattedContent;
 }
 
-// Formatear contenido de la canción con acordes coloreados
-// IMPORTANTE: se escapa el HTML ANTES de insertar acordes/saltos de línea
-// para evitar XSS almacenado (la letra es contenido controlado por el usuario).
+// Formatear contenido de la canción con los acordes ENCIMA de la letra
+// IMPORTANTE: cada línea se escapa ANTES de insertar acordes para evitar XSS
+// almacenado (la letra es contenido controlado por el usuario).
 function formatSongContent(content) {
-    return escapeHtml(content)
-        .replace(/\[([^\]]+)\]/g, '<span class="chord">$1</span>')
-        .replace(/\n/g, '<br>');
+    // \r\n (Windows) → \n, si no cada \r se vería como una línea extra
+    return String(content ?? '').replace(/\r\n?/g, '\n').split('\n').map(renderSongLine).join('');
+}
+
+// Una línea de la canción. Cada acorde va encima del texto que le sigue, como
+// en un cancionero. Cada palabra es un bloque aparte (acorde arriba, letra
+// abajo) para que la línea pueda partirse en pantallas angostas sin que los
+// acordes se desalineen.
+function renderSongLine(line) {
+    const escaped = escapeHtml(line);
+    if (!/\[[^\]]+\]/.test(escaped)) {
+        return `<div class="song-line">${escaped || '&nbsp;'}</div>`;
+    }
+
+    const parts = escaped.split(/\[([^\]]+)\]/); // [texto, acorde, texto, acorde, texto…]
+    const textsAfterChords = parts.filter((_, i) => i > 0 && i % 2 === 0);
+
+    // Línea de solo acordes (intro, interludio), con etiqueta opcional ("Intro: ")
+    if (textsAfterChords.every(t => !t.trim())) {
+        const chords = parts.filter((_, i) => i % 2 === 1).map(c => `<span class="chord">${c}</span>`).join(' ');
+        const label = parts[0].trim() ? `${parts[0].trim()} ` : '';
+        return `<div class="song-line chords-only">${label}${chords}</div>`;
+    }
+
+    const segments = [];
+    const addSegments = (chord, text) => {
+        const words = (text.match(/\S*\s*/g) || []).filter(Boolean);
+        if (!words.length) {
+            if (chord) segments.push(songSegment(chord, ''));
+            return;
+        }
+        words.forEach((word, i) => segments.push(songSegment(i === 0 ? chord : '', word)));
+    };
+    addSegments('', parts[0]); // texto antes del primer acorde
+    for (let i = 1; i < parts.length; i += 2) {
+        addSegments(parts[i], parts[i + 1]);
+    }
+    return `<div class="song-line">${segments.join('')}</div>`;
+}
+
+function songSegment(chord, text) {
+    return `<span class="seg"><span class="chord">${chord}</span><span class="lyric">${text}</span></span>`;
 }
 
 
@@ -868,8 +907,13 @@ function printSong() {
                 .print-hidden { display: none !important; }
                 h1 { margin: 0 0 0.5em 0; }
                 p { margin: 0 0 2em 0; color: #666; }
-                .chord-display { white-space: pre-wrap; line-height: 1.8; }
+                .chord-display { line-height: 1.8; }
                 .chord { color: #000; font-weight: bold; }
+                .song-line { line-height: 1.35; margin-bottom: 0.15em; break-inside: avoid; }
+                .seg { display: inline-flex; flex-direction: column; vertical-align: bottom; }
+                .seg .chord { padding-right: 0.35em; min-height: 1.25em; }
+                .seg .lyric { white-space: pre; }
+                .chords-only .chord { margin-right: 0.6em; }
             </style>
         </head>
         <body>

@@ -27,3 +27,7 @@ temp/
 # Compilados
 dist/
 build/
+
+# Archivos de importación (canciones descargadas de Drive)
+importar/
+__pycache__/

@@ -20,6 +20,33 @@
             word-break: break-word;
         }
 
+        /* Acordes encima de la letra: cada palabra es un bloque (acorde arriba,
+           letra abajo) que puede pasar a la siguiente línea en pantallas angostas */
+        .chord-display .song-line {
+            white-space: normal;
+            line-height: 1.35;
+            margin-bottom: 0.15em;
+        }
+
+        .chord-display .seg {
+            display: inline-flex;
+            flex-direction: column;
+            vertical-align: bottom;
+        }
+
+        .chord-display .seg .chord {
+            padding-right: 0.35em;
+            min-height: 1.25em;
+        }
+
+        .chord-display .seg .lyric {
+            white-space: pre;
+        }
+
+        .chord-display .chords-only .chord {
+            margin-right: 0.6em;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -50,10 +77,6 @@
         .print-content {
             background: white;
             color: black;
-        }
-
-        .print-content .chord {
-            color: #000;
         }
 
         /* Estilos para impresión */
