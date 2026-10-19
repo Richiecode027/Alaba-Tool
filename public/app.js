@@ -735,8 +735,9 @@ const autoScroll = { raf: null, pos: 0, lastTs: 0, pxPerSecond: 0 };
 
 function loadSpeedIndex() {
     try {
-        const saved = Number(localStorage.getItem(STORAGE_KEY_SPEED));
-        if (Number.isInteger(saved) && saved >= 0 && saved < SCROLL_SPEEDS.length) return saved;
+        const raw = localStorage.getItem(STORAGE_KEY_SPEED);
+        const saved = Number(raw);
+        if (raw !== null && Number.isInteger(saved) && saved >= 0 && saved < SCROLL_SPEEDS.length) return saved;
     } catch (error) { /* almacenamiento no disponible */ }
     return 2;
 }

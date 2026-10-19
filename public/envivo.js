@@ -124,8 +124,10 @@ async function startLeading() {
             });
 
         await subscribed;
-        // La lista de presentes llega justo después de entrar (máx. 2 s de espera)
-        await Promise.race([firstSync, new Promise(resolve => setTimeout(resolve, 2000))]);
+        // Supabase solo manda la lista de presentes a quien ya se registró en ella,
+        // así que primero se registra como "observador" (no cuenta como músico)
+        await live.channel.track({ usuario: currentUsername, lider: false, conectando: true });
+        await Promise.race([firstSync, new Promise(resolve => setTimeout(resolve, 3000))]);
         if (live.mode !== 'connecting') return; // se canceló mientras tanto
 
         const otherLeader = currentLiveLeaderName();
@@ -222,7 +224,7 @@ function liveLeaderScrolled() {
 
 function updateLiveBadge() {
     if (live.mode !== 'leader' || !live.channel) return;
-    const musicians = Object.values(live.channel.presenceState()).flat().filter(p => !p.lider).length;
+    const musicians = Object.values(live.channel.presenceState()).flat().filter(p => !p.lider && !p.conectando).length;
     document.getElementById('liveListeners').textContent =
         musicians === 1 ? '1 músico' : `${musicians} músicos`;
 }
