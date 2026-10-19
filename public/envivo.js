@@ -19,6 +19,17 @@ const LIVE_SEND_EVERY_MS = 250;    // máx. 4 mensajes/s mientras el líder se m
 const LIVE_HEARTBEAT_MS = 3000;    // estado completo periódico (para quien entra tarde)
 const LIVE_LEADER_LOST_MS = 10000; // sin noticias del líder → avisar al músico
 const LIVE_SCROLL_ANIM_MS = 260;   // suavizado del desplazamiento en los músicos
+const LIVE_MESSAGE_MAX = 140;      // largo máximo de un mensaje a los músicos
+const LIVE_QUICK_MESSAGES = [
+    'Repetimos el coro',
+    'Último coro',
+    'Vamos al puente',
+    'Una vez más',
+    'Más despacio',
+    'Más rápido',
+    'Bajamos la intensidad',
+    'Terminamos aquí'
+];
 
 const live = {
     mode: null,             // 'leader' | 'follower' | null
@@ -68,6 +79,7 @@ function stopLive() {
         lastAnchor: null, leaderId: null, leader: null, shown: null, pending: null, loading: false
     });
     document.getElementById('liveBadge').classList.add('hidden');
+    document.getElementById('liveMessagePanel').classList.add('hidden');
     document.body.classList.remove('live-leading');
     updateLeadButton();
     releaseWakeLockIfIdle();
@@ -235,6 +247,52 @@ function updateLeadButton() {
 }
 
 // ---------------------------------------------------------------------------
+// Líder: mensajes a los músicos ("Repetimos el coro", "Más despacio"…)
+// ---------------------------------------------------------------------------
+function openLiveMessage() {
+    if (live.mode !== 'leader') return;
+    const quick = document.getElementById('liveQuickMessages');
+    if (!quick.childElementCount) {
+        LIVE_QUICK_MESSAGES.forEach(texto => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm';
+            btn.textContent = texto;
+            btn.addEventListener('click', () => sendLiveMessage(texto));
+            quick.appendChild(btn);
+        });
+    }
+    document.getElementById('liveMessagePanel').classList.remove('hidden');
+}
+
+function closeLiveMessage() {
+    document.getElementById('liveMessagePanel').classList.add('hidden');
+    document.getElementById('liveMessageForm').reset();
+}
+
+function handleLiveMessage(event) {
+    event.preventDefault();
+    sendLiveMessage(document.getElementById('liveMessageText').value);
+}
+
+function sendLiveMessage(texto) {
+    texto = String(texto || '').trim().slice(0, LIVE_MESSAGE_MAX);
+    if (!texto || live.mode !== 'leader' || !live.channel) return;
+
+    live.channel.send({
+        type: 'broadcast',
+        event: 'mensaje',
+        payload: { texto, de: currentDisplayName, leaderId: live.clientId }
+    });
+    closeLiveMessage();
+
+    const musicians = Object.values(live.channel.presenceState()).flat().filter(p => !p.lider && !p.conectando).length;
+    showToast(musicians
+        ? `Enviado a ${musicians === 1 ? '1 músico' : `${musicians} músicos`}: "${texto}"`
+        : `Enviado: "${texto}" (no hay músicos conectados)`);
+}
+
+// ---------------------------------------------------------------------------
 // Músico
 // ---------------------------------------------------------------------------
 async function startFollowing() {
@@ -252,6 +310,9 @@ async function startFollowing() {
         live.channel = await openLiveChannel();
         live.channel
             .on('broadcast', { event: 'estado' }, ({ payload }) => receiveLiveState(payload))
+            .on('broadcast', { event: 'mensaje' }, ({ payload }) => {
+                showToast(String(payload.texto || '').slice(0, LIVE_MESSAGE_MAX), { from: payload.de, vibrate: true });
+            })
             .on('broadcast', { event: 'fin' }, ({ payload }) => {
                 if (payload.leaderId === live.leaderId) {
                     live.leaderId = null;

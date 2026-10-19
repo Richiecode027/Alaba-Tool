@@ -108,7 +108,11 @@ npm run dev
    - **Canción:** si el líder abre otra (por ejemplo desde el set list), cambia también para ellos.
    - **Tono:** si el líder transpone, también se les transpone.
    - **Posición:** si el líder baja, ya sea con el dedo o con auto-scroll, su pantalla baja.
-3. Para terminar, el líder pulsa **Terminar**. Los músicos salen con **Salir**.
+3. **Mensajes:** el líder pulsa **💬** en su indicador EN VIVO y elige un mensaje rápido ("Repetimos el coro", "Último coro", "Más despacio"…) o escribe uno propio (máx. 140 caracteres).
+   - A los músicos les aparece un globo arriba, sobre la barra y no sobre la letra, con el nombre de quien lo manda.
+   - El globo se cierra solo (más tiempo si el texto es largo) o al tocarlo.
+   - El celular vibra brevemente, si lo permite.
+4. Para terminar, el líder pulsa **Terminar**. Los músicos salen con **Salir**.
 
 Notas:
 - La posición se comparte por línea de la canción, no en píxeles, para que coincida aunque cada quien tenga otro tamaño de pantalla.

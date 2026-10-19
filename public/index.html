@@ -52,6 +52,54 @@
             padding-top: 3rem !important;
         }
 
+        /* Globos de notificación: arriba y centrados, sobre la barra (no sobre la letra) */
+        #toastContainer {
+            position: fixed;
+            top: 0.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 60;
+            width: min(92vw, 26rem);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            pointer-events: auto;
+            cursor: pointer;
+            background: rgba(17, 24, 39, 0.9);
+            color: #fff;
+            border-radius: 1rem;
+            padding: 0.6rem 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(6px);
+            animation: toastIn 0.25s ease-out;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .toast-from {
+            font-size: 0.75rem;
+            opacity: 0.75;
+            margin-bottom: 0.1rem;
+        }
+
+        .toast-text {
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .toast-hide {
+            opacity: 0;
+            transform: translateY(-0.5rem);
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-0.75rem); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* Punto pulsante del modo En vivo */
         .live-dot {
             display: inline-block;
@@ -569,7 +617,7 @@
         <button id="speedToggleBtn" onclick="cycleSpeed()" class="h-12 px-3 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-sm font-semibold" title="Velocidad del auto-scroll">x3</button>
         <button id="autoToggleBtn" onclick="toggleAutoScroll()" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-lg" title="Iniciar auto-scroll">▶</button>
         <!-- Back button placed next to auto-scroll for easier reach -->
-        <button id="detailBackBtn" onclick="showSection('songs-list')" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm flex items-center justify-center" title="Volver">←</button>
+        <button id="detailBackBtn" onclick="goBackFromSong()" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm flex items-center justify-center" title="Volver">←</button>
 
         <!-- Hamburger + popover menu -->
         <div class="relative">
@@ -592,8 +640,27 @@
     <div id="liveBadge" class="hidden fixed top-2 left-1/2 -translate-x-1/2 z-50 print-hidden flex items-center gap-3 bg-red-600 text-white rounded-full shadow-lg pl-4 pr-1 py-1 text-sm">
         <span class="font-bold whitespace-nowrap"><span class="live-dot"></span> EN VIVO</span>
         <span id="liveListeners" class="whitespace-nowrap opacity-90">0 músicos</span>
+        <button onclick="openLiveMessage()" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full font-semibold" title="Mandar un mensaje a los músicos" aria-label="Mandar un mensaje a los músicos">💬</button>
         <button onclick="stopLive()" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full font-semibold">Terminar</button>
     </div>
+
+    <!-- Líder: mensaje a los músicos -->
+    <div id="liveMessagePanel" class="hidden fixed inset-x-0 bottom-0 z-50 print-hidden p-3 sm:p-4 flex justify-center" role="dialog" aria-label="Mensaje a los músicos">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800">Mensaje a los músicos</h3>
+                <button type="button" onclick="closeLiveMessage()" class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500" aria-label="Cerrar">✕</button>
+            </div>
+            <div id="liveQuickMessages" class="flex flex-wrap gap-2 mb-3"></div>
+            <form id="liveMessageForm" onsubmit="handleLiveMessage(event)" class="flex gap-2">
+                <input type="text" id="liveMessageText" maxlength="140" autocomplete="off" placeholder="Escribe un mensaje…" class="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+                <button type="submit" class="shrink-0 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Enviar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Globos de notificación (mensajes del líder, avisos) -->
+    <div id="toastContainer" class="print-hidden" aria-live="polite"></div>
 
     <!-- Modal: Sobre el autor -->
     <div id="authorModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden p-4">

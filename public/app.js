@@ -12,6 +12,41 @@ let setlistLongPressTimer = null;
 // Animación: id de la canción que se acaba de mover
 let lastMovedSongId = null;
 
+// ---------------------------------------------------------------------------
+// Globos de notificación (no invasivos): aparecen arriba, se cierran solos
+// (más tiempo si el texto es largo) o al tocarlos.
+// ---------------------------------------------------------------------------
+function showToast(text, { from = null, vibrate = false } = {}) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.setAttribute('role', 'status');
+    if (from) {
+        const sender = document.createElement('p');
+        sender.className = 'toast-from';
+        sender.textContent = from;          // textContent: el mensaje nunca se interpreta como HTML
+        toast.appendChild(sender);
+    }
+    const body = document.createElement('p');
+    body.className = 'toast-text';
+    body.textContent = text;
+    toast.appendChild(body);
+
+    const close = () => {
+        toast.classList.add('toast-hide');
+        setTimeout(() => toast.remove(), 300);
+    };
+    toast.addEventListener('click', close);
+    container.appendChild(toast);
+    // Máximo 3 a la vista: el más viejo se va
+    while (container.children.length > 3) container.firstElementChild.remove();
+
+    setTimeout(close, Math.min(10000, 4000 + text.length * 60));
+    if (vibrate && navigator.vibrate) navigator.vibrate(80);
+}
+
 // Indicador de carga
 function showLoading() {
     document.getElementById('loadingIndicator').classList.remove('hidden');
@@ -289,12 +324,11 @@ function setupEventListeners() {
         // ignore
     }
 
-    // Interceptar popstate (botón atrás) para navegar a inicio en lugar de salir de la app
-    window.addEventListener('popstate', (e) => {
-        const state = e.state;
-        const songDetailVisible = document.getElementById('song-detail') && !document.getElementById('song-detail').classList.contains('hidden');
-        if (songDetailVisible) {
-            showSection('songs-list');
+    // Botón "atrás" del celular: desde una canción, volver a donde estabas
+    // (Set list o Canciones) en lugar de salir de la app
+    window.addEventListener('popstate', () => {
+        if (currentSection === 'song-detail') {
+            returnFromSong();
             // dejar un estado home en el historial para evitar salir con otro back
             try { history.replaceState({page: 'home'}, '', location.href); } catch (err) {}
         }
@@ -314,13 +348,28 @@ document.addEventListener('click', (e) => {
     if (e.target.id === 'authorModal') closeAuthorModal();
 });
 
-// Mostrar/ocultar secciones
-function showSection(sectionId) {
+// Navegación: desde qué lista se abrió la canción actual y en qué posición
+// estaba cada lista, para que "←" regrese al mismo lugar (no siempre al inicio)
+const SONG_RETURN_SECTIONS = ['songs-list', 'setlist'];
+let currentSection = 'songs-list';
+let songReturnSection = 'songs-list';
+const sectionScroll = {};
+
+// Mostrar/ocultar secciones. Con restoreScroll se vuelve a la posición que tenía.
+function showSection(sectionId, { restoreScroll = false } = {}) {
     const section = document.getElementById(sectionId);
     // Secciones restringidas por rol (data-requiere="editor" | "admin")
     if (section && section.dataset.requiere && !can(section.dataset.requiere)) {
         return;
     }
+
+    if (currentSection !== sectionId) {
+        sectionScroll[currentSection] = window.scrollY;
+        if (sectionId === 'song-detail' && SONG_RETURN_SECTIONS.includes(currentSection)) {
+            songReturnSection = currentSection;
+        }
+    }
+    currentSection = sectionId;
 
     document.querySelectorAll('.section-content').forEach(s => {
         s.classList.add('hidden');
@@ -367,8 +416,24 @@ function showSection(sectionId) {
         stopAutoScroll();
     }
 
-    // Scroll al top
-    window.scrollTo(0, 0);
+    // Arriba, o donde estaba si se está regresando
+    // 'instant': sin la animación de scroll-behavior: smooth (style.css)
+    window.scrollTo({ top: restoreScroll ? (sectionScroll[sectionId] || 0) : 0, behavior: 'instant' });
+}
+
+// "←" en una canción: regresar a la lista desde donde se abrió, en su posición
+function returnFromSong() {
+    showSection(songReturnSection, { restoreScroll: true });
+}
+
+// Botón "←" de la pantalla: si la canción dejó una entrada en el historial,
+// se usa history.back() para que el "atrás" del celular siga funcionando igual
+function goBackFromSong() {
+    if (history.state && history.state.page === 'song') {
+        history.back(); // dispara popstate → returnFromSong()
+    } else {
+        returnFromSong();
+    }
 }
 
 // Cargar todas las canciones
@@ -1014,7 +1079,7 @@ async function deleteCurrentSong() {
 
     if (await removeSong(currentSong.id)) {
         currentSong = null;
-        showSection('songs-list');
+        goBackFromSong();
     }
 }
 
