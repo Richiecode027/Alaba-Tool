@@ -4,12 +4,8 @@ let allSongs = [];
 let setlist = [];
 let draggedSetlistIndex = null;
 let autoScrollActive = false;
-let scrollPaused = false;
-let scrollInterval = null;
-let speedIndex = 1; // 0 -> x1, 1 -> x2, 2 -> x3 (default x2)
+let speedIndex; // índice en SCROLL_SPEEDS; se carga al iniciar (ver loadSpeedIndex)
 const STORAGE_KEY_SETLIST = 'alabaToolSetlist';
-// Velocidades de auto-scroll (más lentas: delays mayores = desplazamiento más lento)
-const SPEED_DELAYS = [600, 300, 150]; // Delays en ms para cada velocidad
 // Estado para distinguir toque corto (abrir) vs arrastre/long-press
 let setlistIsDragging = false;
 let setlistLongPressTimer = null;
@@ -51,6 +47,7 @@ const ROLE_LEVEL = { lector: 1, editor: 2, admin: 3 };
 const ROLE_LABEL = { lector: 'Lector', editor: 'Editor', admin: 'Administrador' };
 let currentUser = null;
 let currentRole = null;
+let currentUsername = null;
 
 function can(minRole) {
     return (ROLE_LEVEL[currentRole] || 0) >= ROLE_LEVEL[minRole];
@@ -102,6 +99,7 @@ async function startApp(user) {
     }
 
     currentRole = data.rol;
+    currentUsername = data.usuario;
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('accountUsername').textContent = data.usuario;
@@ -146,6 +144,7 @@ async function handleLogin(event) {
 async function logout() {
     closeAccountModal();
     if (autoScrollActive) stopAutoScroll();
+    stopLive();
     await sb.auth.signOut();
     currentUser = null;
     currentRole = null;
@@ -197,6 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     sb.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT' && currentUser) {
+            stopLive();
             currentUser = null;
             currentRole = null;
             showLoginScreen();
@@ -213,22 +213,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Configurar listeners de eventos
 function setupEventListeners() {
-    // Tecla Espacio para pausar/reanudar auto-scroll
+    // Tecla Espacio: iniciar/pausar auto-scroll en la vista de canción
     document.addEventListener('keydown', (e) => {
-        if (e.code === 'Space' && autoScrollActive && currentSong) {
+        const inSongDetail = !document.getElementById('song-detail').classList.contains('hidden');
+        const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+        if (e.code === 'Space' && inSongDetail && !typing && currentSong) {
             e.preventDefault();
-            togglePauseScroll();
+            toggleAutoScroll();
         }
     });
 
-    // Botón de velocidad (x1/x2/x3) - inicializar y configurar listener
-    const speedBtn = document.getElementById('speedToggleBtn');
-    if (speedBtn) {
-        speedBtn.textContent = ['x1', 'x2', 'x3'][speedIndex];
-        speedBtn.addEventListener('click', () => {
-            cycleSpeed();
-        });
-    }
+    // Velocidad del auto-scroll (se recuerda en este dispositivo)
+    speedIndex = loadSpeedIndex();
+    updateAutoScrollButtons();
+
+    // Si el líder está dirigiendo en vivo, cada movimiento se transmite
+    document.getElementById('songContent').addEventListener('scroll', () => liveLeaderScrolled(), { passive: true });
 
     // Botón hamburguesa: abrir/cerrar menú
     const hamburgerBtn = document.getElementById('hamburgerBtn');
@@ -302,10 +302,15 @@ function showSection(sectionId) {
         loadMembers();
     }
 
+    // Un músico que sale de la pantalla En vivo deja de seguir al líder
+    if (live.mode === 'follower' && sectionId !== 'en-vivo') {
+        stopLive();
+    }
+
     const mainNav = document.getElementById('mainNav');
     const hamburgerContainer = document.getElementById('hamburgerContainer');
 
-    if (mainNav) mainNav.classList.toggle('hidden', sectionId === 'song-detail');
+    if (mainNav) mainNav.classList.toggle('hidden', sectionId === 'song-detail' || sectionId === 'en-vivo');
     if (hamburgerContainer) hamburgerContainer.classList.toggle('hidden', sectionId !== 'song-detail');
 
     const detailBackBtn = document.getElementById('detailBackBtn');
@@ -582,9 +587,10 @@ async function viewSong(id) {
         const { data, error } = await sb.from(SONGS_TABLE).select('*').eq('id', id).single();
         if (error) throw error;
         currentSong = data;
-        // Mostrar la canción
-        displaySongDetail();
+        // Mostrar la canción desde el principio (si no, conserva el scroll de la anterior)
         showSection('song-detail');
+        document.getElementById('songContent').scrollTop = 0;
+        displaySongDetail();
         // Añadir entrada de historial para interceptar botón atrás del teléfono
         try {
             history.pushState({page: 'song', songId: id}, '', '#song-' + id);
@@ -611,6 +617,9 @@ function displaySongDetail() {
     // Renderizar contenido con acordes resaltados
     const formattedContent = formatSongContent(currentSong.contenido);
     document.getElementById('songContent').innerHTML = formattedContent;
+
+    // Si está dirigiendo en vivo, los músicos ven la nueva canción / tono
+    liveSongChanged();
 }
 
 // Formatear contenido de la canción con los acordes ENCIMA de la letra
@@ -708,13 +717,41 @@ async function transposeToKey(newKey) {
     displaySongDetail();
 }
 
+// ---------------------------------------------------------------------------
 // Auto-scroll
-function toggleAutoScroll() {
-    if (!currentSong) {
-        alert('Por favor, selecciona una canción primero');
-        return;
-    }
+// Avanza cuadro a cuadro (requestAnimationFrame) para que el movimiento sea
+// continuo. La velocidad se define en segundos por línea de canción (acordes +
+// letra), así se siente igual en cualquier pantalla o tamaño de letra.
+// ---------------------------------------------------------------------------
+const SCROLL_SPEEDS = [
+    { label: 'x1', secondsPerLine: 8 },   // himno lento
+    { label: 'x2', secondsPerLine: 6 },
+    { label: 'x3', secondsPerLine: 4.5 },
+    { label: 'x4', secondsPerLine: 3.5 },
+    { label: 'x5', secondsPerLine: 2.5 }  // canto rápido
+];
+const STORAGE_KEY_SPEED = 'alabaToolScrollSpeed';
+const autoScroll = { raf: null, pos: 0, lastTs: 0, pxPerSecond: 0 };
 
+function loadSpeedIndex() {
+    try {
+        const saved = Number(localStorage.getItem(STORAGE_KEY_SPEED));
+        if (Number.isInteger(saved) && saved >= 0 && saved < SCROLL_SPEEDS.length) return saved;
+    } catch (error) { /* almacenamiento no disponible */ }
+    return 2;
+}
+
+// Alto promedio de una línea de la canción (con acordes, si las hay)
+function averageSongLineHeight(container) {
+    const lines = [...container.querySelectorAll('.song-line')];
+    const withChords = lines.filter(line => line.querySelector('.seg'));
+    const sample = (withChords.length ? withChords : lines).slice(0, 30);
+    if (!sample.length) return 40;
+    return sample.reduce((sum, line) => sum + line.getBoundingClientRect().height, 0) / sample.length;
+}
+
+function toggleAutoScroll() {
+    if (!currentSong) return;
     if (autoScrollActive) {
         stopAutoScroll();
     } else {
@@ -723,44 +760,98 @@ function toggleAutoScroll() {
 }
 
 function startAutoScroll() {
+    const container = document.getElementById('songContent');
+    // Si ya estaba al final, empezar otra vez desde arriba
+    if (container.scrollTop >= container.scrollHeight - container.clientHeight - 1) {
+        container.scrollTop = 0;
+    }
     autoScrollActive = true;
-    scrollPaused = false;
-    const autoBtn = document.getElementById('autoToggleBtn');
-    if (autoBtn) autoBtn.textContent = '⏸';
+    autoScroll.pos = container.scrollTop;
+    autoScroll.lastTs = 0;
+    autoScroll.pxPerSecond = averageSongLineHeight(container) / SCROLL_SPEEDS[speedIndex].secondsPerLine;
+    updateAutoScrollButtons();
+    requestWakeLock();
+    autoScroll.raf = requestAnimationFrame(autoScrollStep);
+}
 
-    const scrollContent = document.getElementById('songContent');
-    const delay = SPEED_DELAYS[speedIndex];
+function autoScrollStep(timestamp) {
+    if (!autoScrollActive) return;
+    const container = document.getElementById('songContent');
 
-    scrollInterval = setInterval(() => {
-        if (!scrollPaused) {
-            scrollContent.scrollBy(0, 3);
+    if (autoScroll.lastTs) {
+        // Tope de 100 ms: al volver de segundo plano no da un salto
+        const seconds = Math.min(timestamp - autoScroll.lastTs, 100) / 1000;
+        // Si alguien movió la canción con el dedo, continuar desde ahí
+        if (Math.abs(container.scrollTop - autoScroll.pos) > 3) {
+            autoScroll.pos = container.scrollTop;
         }
-    }, delay);
+        autoScroll.pos += autoScroll.pxPerSecond * seconds;
+        container.scrollTop = autoScroll.pos;
+
+        if (container.scrollTop >= container.scrollHeight - container.clientHeight - 1) {
+            stopAutoScroll(); // llegó al final
+            return;
+        }
+    }
+    autoScroll.lastTs = timestamp;
+    autoScroll.raf = requestAnimationFrame(autoScrollStep);
 }
 
 function stopAutoScroll() {
     autoScrollActive = false;
-    scrollPaused = false;
-    clearInterval(scrollInterval);
-    const autoBtn = document.getElementById('autoToggleBtn');
-    if (autoBtn) autoBtn.textContent = '▶';
-}
-
-function togglePauseScroll() {
-    scrollPaused = !scrollPaused;
-    const autoBtn = document.getElementById('autoToggleBtn');
-    if (autoBtn) autoBtn.textContent = scrollPaused ? '▶' : '⏸';
+    cancelAnimationFrame(autoScroll.raf);
+    updateAutoScrollButtons();
+    releaseWakeLockIfIdle();
 }
 
 function cycleSpeed() {
-    speedIndex = (speedIndex + 1) % 3;
-    const btn = document.getElementById('speedToggleBtn');
-    if (btn) btn.textContent = ['x1', 'x2', 'x3'][speedIndex];
-    if (autoScrollActive && !scrollPaused) {
-        clearInterval(scrollInterval);
-        startAutoScroll();
+    speedIndex = (speedIndex + 1) % SCROLL_SPEEDS.length;
+    try { localStorage.setItem(STORAGE_KEY_SPEED, String(speedIndex)); } catch (error) { /* sin almacenamiento */ }
+    if (autoScrollActive) {
+        // Se aplica al momento, sin reiniciar ni saltar
+        autoScroll.pxPerSecond = averageSongLineHeight(document.getElementById('songContent')) / SCROLL_SPEEDS[speedIndex].secondsPerLine;
+    }
+    updateAutoScrollButtons();
+}
+
+function updateAutoScrollButtons() {
+    const autoBtn = document.getElementById('autoToggleBtn');
+    if (autoBtn) {
+        autoBtn.textContent = autoScrollActive ? '⏸' : '▶';
+        autoBtn.title = autoScrollActive ? 'Pausar auto-scroll' : 'Iniciar auto-scroll';
+    }
+    const speedBtn = document.getElementById('speedToggleBtn');
+    if (speedBtn) speedBtn.textContent = SCROLL_SPEEDS[speedIndex].label;
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla siempre encendida mientras hay auto-scroll o modo En vivo
+// ---------------------------------------------------------------------------
+let wakeLock = null;
+
+async function requestWakeLock() {
+    if (wakeLock || !('wakeLock' in navigator)) return;
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (error) { /* el navegador lo negó (p. ej. pestaña en segundo plano) */ }
+}
+
+function releaseWakeLockIfIdle() {
+    const liveActive = typeof live !== 'undefined' && live.mode;
+    if (wakeLock && !autoScrollActive && !liveActive) {
+        wakeLock.release();
+        wakeLock = null;
     }
 }
+
+// El navegador suelta el bloqueo al cambiar de pestaña: pedirlo otra vez al volver
+document.addEventListener('visibilitychange', () => {
+    const liveActive = typeof live !== 'undefined' && live.mode;
+    if (document.visibilityState === 'visible' && (autoScrollActive || liveActive)) {
+        requestWakeLock();
+    }
+});
 
 // Crear canción
 async function handleCreateSong(event) {

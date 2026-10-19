@@ -10,6 +10,7 @@ Netlify (sitio estático, sin build)
 │   ├── config.js                   URL y anon key públicas de Supabase
 │   ├── app.js                      canciones, set list, auto-scroll, sesión y roles
 │   ├── admin.js                    módulo Usuarios (solo Administrador)
+│   ├── envivo.js                   modo En vivo: los músicos siguen al líder (Supabase Realtime)
 │   └── transposer.js               motor de transposición (corre en el navegador)
 └── netlify/functions/
     └── admin-usuarios.mjs          alta de cuentas (única pieza con la service_role key)
@@ -30,6 +31,8 @@ Supabase (proyecto compartido con PSI, Arcade y Nupcia)
 | | Lector | Editor | Administrador |
 |---|:-:|:-:|:-:|
 | Ver, buscar, transponer, imprimir, set list, auto-scroll | ✅ | ✅ | ✅ |
+| Seguir al líder en **En vivo** | ✅ | ✅ | ✅ |
+| **Dirigir en vivo** | ❌ | ✅ | ✅ |
 | Crear, editar y eliminar canciones | ❌ | ✅ | ✅ |
 | Módulo **Usuarios**: dar de alta, cambiar rol, quitar acceso | ❌ | ❌ | ✅ |
 
@@ -47,6 +50,8 @@ Supabase (proyecto compartido con PSI, Arcade y Nupcia)
 En Supabase → **SQL Editor** → New query, pega el contenido de [supabase/schema.sql](supabase/schema.sql) y ejecútalo. Es idempotente.
 
 > Si ya habías ejecutado la primera versión de `schema.sql` (la de correos), ejecuta también [supabase/migration-1-usuarios.sql](supabase/migration-1-usuarios.sql).
+
+Para el modo **En vivo**, ejecuta además [supabase/migration-2-en-vivo.sql](supabase/migration-2-en-vivo.sql). Crea las políticas del canal privado de Realtime: escucha cualquier miembro y transmiten solo editores y administradores.
 
 ### 2. Primer Administrador
 
@@ -90,6 +95,39 @@ Para probar todo, incluida la función de alta, usa [Netlify CLI](https://docs.n
 ```bash
 npm run dev
 ```
+
+## Tocar en vivo
+
+### Modo En vivo (los músicos siguen al líder)
+
+1. **El líder** (Editor o Administrador) abre una canción → menú **☰ → ● Dirigir en vivo**. Arriba aparece "● EN VIVO · N músicos".
+2. **Los músicos** pulsan **● En vivo** en la lista de canciones. A partir de ahí ven exactamente lo del líder, sin tocar nada:
+   - **Canción:** si el líder abre otra (por ejemplo desde el set list), cambia también para ellos.
+   - **Tono:** si el líder transpone, también se les transpone.
+   - **Posición:** si el líder baja, ya sea con el dedo o con auto-scroll, su pantalla baja.
+3. Para terminar, el líder pulsa **Terminar**. Los músicos salen con **Salir**.
+
+Notas:
+- La posición se comparte por línea de la canción, no en píxeles, para que coincida aunque cada quien tenga otro tamaño de pantalla.
+- La pantalla no se apaga mientras están en vivo.
+- Si un músico entra tarde o pierde la señal, se pone al día solo en un par de segundos.
+- Si otro Editor empieza a dirigir, el anterior deja de dirigir y se le avisa.
+
+### Auto-scroll
+
+- **▶ / ⏸** inicia y pausa. En computadora también funciona la barra espaciadora.
+- **x1–x5** cambia la velocidad al momento, incluso en pausa, y se recuerda en cada dispositivo:
+
+| Velocidad | Segundos por línea | Para |
+|---|---|---|
+| x1 | 8 | himno lento |
+| x2 | 6 | |
+| x3 | 4.5 | (predeterminada) |
+| x4 | 3.5 | |
+| x5 | 2.5 | canto rápido |
+
+- La velocidad se mide en líneas de canción (acordes + letra), así se siente igual en cualquier pantalla.
+- Se detiene solo al llegar al final. Si mueves la canción con el dedo, sigue desde ahí.
 
 ## Formato de las canciones
 

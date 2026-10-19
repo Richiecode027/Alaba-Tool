@@ -47,6 +47,27 @@
             margin-right: 0.6em;
         }
 
+        /* Mientras el líder dirige, dejar lugar arriba para el indicador EN VIVO */
+        body.live-leading #songDetailContainer {
+            padding-top: 3rem !important;
+        }
+
+        /* Punto pulsante del modo En vivo */
+        .live-dot {
+            display: inline-block;
+            width: 0.55em;
+            height: 0.55em;
+            border-radius: 50%;
+            background: currentColor;
+            vertical-align: middle;
+            animation: livePulse 1.4s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -251,7 +272,13 @@
         <!-- Sección: Lista de Canciones -->
         <section id="songs-list" class="section-content">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-3xl font-bold mb-6 text-gray-800">Mis Canciones</h2>
+                <div class="flex items-center justify-between gap-3 mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Mis Canciones</h2>
+                    <!-- Músicos: seguir lo que el líder está viendo -->
+                    <button onclick="startFollowing()" class="shrink-0 px-4 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 shadow" title="Ver lo mismo que el líder, sin tocar la pantalla">
+                        <span class="live-dot"></span> En vivo
+                    </button>
+                </div>
 
                 <!-- Barra de búsqueda con filtro por género -->
                 <div class="mb-6">
@@ -397,6 +424,21 @@
         </section>
 
         <!-- Sección: Editar Canción -->
+        <!-- Sección: En vivo (músicos siguiendo al líder) -->
+        <section id="en-vivo" class="section-content hidden">
+            <div class="fixed inset-0 z-30 bg-white flex flex-col">
+                <div class="flex items-center justify-between gap-3 px-3 py-2 bg-red-600 text-white print-hidden">
+                    <div class="min-w-0">
+                        <p class="text-xs uppercase tracking-wide opacity-90"><span class="live-dot"></span> En vivo</p>
+                        <h2 id="liveTitle" class="font-bold text-lg truncate">En vivo</h2>
+                    </div>
+                    <button onclick="leaveLive()" class="shrink-0 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-semibold">Salir</button>
+                </div>
+                <p id="liveStatus" class="px-3 py-1 text-sm text-gray-600 bg-gray-100 print-hidden"></p>
+                <div id="liveContent" class="chord-display flex-1 overflow-y-auto px-4 py-2 text-lg"></div>
+            </div>
+        </section>
+
         <section id="edit-song" class="section-content hidden" data-requiere="editor">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-3xl font-bold mb-6 text-gray-800">Editar Canción</h2>
@@ -519,7 +561,9 @@
     <!-- Floating hamburger menu + auto-scroll button -->
     <div id="hamburgerContainer" class="hidden fixed right-4 bottom-4 z-50 print-hidden flex items-end gap-3">
         <!-- Auto-scroll button stays always visible (fuera del menú) -->
-        <button id="autoToggleBtn" onclick="toggleAutoScroll()" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-lg" title="Auto-scroll">▶</button>
+        <!-- Velocidad del auto-scroll: a la vista, no dentro del menú -->
+        <button id="speedToggleBtn" onclick="cycleSpeed()" class="h-12 px-3 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-sm font-semibold" title="Velocidad del auto-scroll">x3</button>
+        <button id="autoToggleBtn" onclick="toggleAutoScroll()" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm hover:shadow-md flex items-center justify-center text-lg" title="Iniciar auto-scroll">▶</button>
         <!-- Back button placed next to auto-scroll for easier reach -->
         <button id="detailBackBtn" onclick="showSection('songs-list')" class="w-12 h-12 bg-white/95 text-gray-800 rounded-full shadow-sm flex items-center justify-center" title="Volver">←</button>
 
@@ -535,9 +579,16 @@
                     <button id="transposeUpBtn" onclick="transposeUp(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">+ Tono</button>
                     <button id="transposeDownBtn" onclick="transposeDown(); toggleHamburger(false)" class="flex-1 px-2 py-2 bg-gray-50 rounded">− Tono</button>
                 </div>
-                <button id="speedToggleBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded">x1</button>
+                <button id="leadLiveBtn" data-rol="editor" onclick="toggleLeading(); toggleHamburger(false)" class="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 font-semibold rounded">● Dirigir en vivo</button>
             </div>
         </div>
+    </div>
+
+    <!-- Indicador del líder mientras dirige en vivo -->
+    <div id="liveBadge" class="hidden fixed top-2 left-1/2 -translate-x-1/2 z-50 print-hidden flex items-center gap-3 bg-red-600 text-white rounded-full shadow-lg pl-4 pr-1 py-1 text-sm">
+        <span class="font-bold whitespace-nowrap"><span class="live-dot"></span> EN VIVO</span>
+        <span id="liveListeners" class="whitespace-nowrap opacity-90">0 músicos</span>
+        <button onclick="stopLive()" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full font-semibold">Terminar</button>
     </div>
 
     <!-- Modal: Sobre el autor -->
@@ -591,6 +642,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
     <script src="transposer.js"></script>
     <script src="app.js"></script>
+    <script src="envivo.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>
